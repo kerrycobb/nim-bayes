@@ -21,15 +21,16 @@ $ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\b
 """
 nbCode:
   import sequtils, random 
+  randomize()
   var 
     n = 100
     b0 = 0.0
     b1 = 1.0
-    sd = 10.0
+    sd = 1.0
     x = newSeq[float](n)
     y = newSeq[float](n)
   for i in 0 ..< n: 
-    x[i] = rand(10.0..100.0) 
+    x[i] = rand(0.0..100.0) 
     y[i] = b0 + b1 * x[i] + gauss(0.0, sd) 
 
 
@@ -43,26 +44,6 @@ nbCode:
     geom_point() +
     ggsave("images/simulated-data.png")
 nbImage("images/simulated-data.png")
-
-
-nbText: md"""
-#### Rescale Data
-"""
-nbCode:
-  import stats
-  let 
-    meanX = mean(x) 
-    sdX = standardDeviation(x)
-    meanY = mean(y) 
-    sdY = standardDeviation(y)
-  for i in 0 ..< n:
-    x[i] = (x[i] - meanX) / sdX 
-  var scaled = seqsToDf(x, y)
-  ggplot(scaled, aes("x", "y")) +
-    geom_point() +
-    ggsave("images/simulated-scaled-data.png")
-nbImage("images/simulated-scaled-data.png")
-
 
 
 nbText: md"""
@@ -113,16 +94,16 @@ nbCode:
 
   b0Samples[0] = 0.0  
   b1Samples[0] = 1.0 
-  sdSamples[0] = 10.0 
+  sdSamples[0] = 1.0 
   
   for i in 1..nSamples:
     let 
       prevB0 = b0Samples[i-1]
       prevB1 = b1Samples[i-1]
       prevSd = sdSamples[i-1]
-      propB0 = gauss(prevB0, 0.3) 
+      propB0 = gauss(prevB0, 0.1) 
       propB1 = gauss(prevB1, 0.1)
-      propSd = gauss(prevSd, 1.0)
+      propSd = gauss(prevSd, 0.1)
     if propSd > 0.0:
       var
         prevLogPost = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
@@ -142,7 +123,6 @@ nbCode:
       sdSamples[i] = prevSd  
 
 
-
 nbText: md"""
 #### Burnin
 """
@@ -154,6 +134,7 @@ nbText: md"""
 #### Posterior means
 """
 nbCode:
+  import stats
   let
     meanB0 = mean(b0Samples[burnin..^1])
     meanB1 = mean(b1Samples[burnin..^1])
@@ -195,6 +176,7 @@ nbCode:
   echo b1HdiMin, " ", b1HdiMax
   echo sdHdiMin, " ", sdHdiMax
 
+
 nbText: md"""
 ## Histograms
 """
@@ -206,6 +188,7 @@ nbCode:
       "b0":b0Samples[burnin..^1],
       "b1":b1Samples[burnin..^1],
       "sd":sdSamples[burnin..^1]})
+
   ggplot(df, aes(x="ixs", y="b0")) + 
     geom_line() +
     ggsave("images/samples-b0.png")
@@ -220,7 +203,6 @@ nbCode:
 nbImage("images/samples-b0.png")
 nbImage("images/samples-b1.png")
 nbImage("images/samples-sd.png")
-
 
 
 nbText: md"""
