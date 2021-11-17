@@ -25,7 +25,7 @@ nbCode:
     n = 100
     b0 = 0.0
     b1 = 1.0
-    sd = 100.0
+    sd = 10.0
     x = newSeq[float](n)
     y = newSeq[float](n)
   for i in 0 ..< n: 
@@ -33,7 +33,6 @@ nbCode:
     y[i] = b0 + b1 * x[i] + gauss(0.0, sd) 
 
 
-# Plot data
 nbText: md"""
 #### Plot Data
 """
@@ -58,16 +57,16 @@ nbCode:
     sdY = standardDeviation(y)
   for i in 0 ..< n:
     x[i] = (x[i] - meanX) / sdX 
-  ggplot(sim, aes("x", "y")) +
+  var scaled = seqsToDf(x, y)
+  ggplot(scaled, aes("x", "y")) +
     geom_point() +
     ggsave("images/simulated-scaled-data.png")
 nbImage("images/simulated-scaled-data.png")
 
 
 
-## Likelihood
 nbText: md"""
-### Likelihood:
+## Likelihood
 """
 nbCode:
   import distributions, math
@@ -79,9 +78,8 @@ nbCode:
     result = sum(likelihoods) 
 
 
-## Prior
 nbText: md"""
-### Prior
+## Prior
 """
 nbCode:
   proc logPrior(b0, b1, sd: float): float = 
@@ -93,7 +91,7 @@ nbCode:
 
 
 nbText: md"""
-### Posterior
+## Posterior
 """
 nbCode:
   proc logPosterior(x, y: seq[float], b0, b1, sd: float): float = 
@@ -104,7 +102,7 @@ nbCode:
 
 
 nbText: md"""
-### MCMC
+## MCMC
 """
 nbCode:
   var 
@@ -127,9 +125,9 @@ nbCode:
       propSd = gauss(prevSd, 1.0)
     if propSd > 0.0:
       var
-        prevLogPosterior = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
-        propLogPosterior = logPosterior(x=x, y=y, b0=propB0, b1=propB1, sd=propSd) 
-        ratio = exp(propLogPosterior - prevLogPosterior)  
+        prevLogPost = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
+        propLogPost = logPosterior(x=x, y=y, b0=propB0, b1=propB1, sd=propSd) 
+        ratio = exp(propLogPost - prevLogPost)  
       if rand(1.0) < ratio:
         b0Samples[i] = propB0  
         b1Samples[i] = propB1  
@@ -153,7 +151,7 @@ nbCode:
 
 
 nbText: md"""
-##### Posterior means
+#### Posterior means
 """
 nbCode:
   let
@@ -166,7 +164,7 @@ nbCode:
 
 
 nbText: md"""
-### Highest density interval
+## Highest density interval
 """
 nbCode:
   import algorithm
@@ -184,7 +182,10 @@ nbCode:
       hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
     result = (hdiMin, hdiMax)
 
-nbText: "The intervals are:"
+
+nbText: md"""
+#### The intervals
+"""
 nbCode:
   let 
     (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin..^1], 0.95)
@@ -194,10 +195,8 @@ nbCode:
   echo b1HdiMin, " ", b1HdiMax
   echo sdHdiMin, " ", sdHdiMax
 
-
 nbText: md"""
-Look at the output.
-Trace plots:
+## Histograms
 """
 nbCode:
   let 
@@ -207,26 +206,6 @@ nbCode:
       "b0":b0Samples[burnin..^1],
       "b1":b1Samples[burnin..^1],
       "sd":sdSamples[burnin..^1]})
-  ggplot(df, aes("b0")) +
-    geom_histogram() +
-    ggsave("images/hist-b0.png")
-  
-  ggplot(df, aes("b1")) +
-    geom_histogram() +
-    ggsave("images/hist-b1.png")
-  
-  ggplot(df, aes("sd")) +
-    geom_histogram() +
-    ggsave("images/hist-sd.png")
-nbImage("images/hist-b0.png")
-nbImage("images/hist-b1.png")
-nbImage("images/hist-sd.png")
-
-
-nbText: md"""
-Histograms:
-"""
-nbCode:
   ggplot(df, aes(x="ixs", y="b0")) + 
     geom_line() +
     ggsave("images/samples-b0.png")
@@ -241,6 +220,27 @@ nbCode:
 nbImage("images/samples-b0.png")
 nbImage("images/samples-b1.png")
 nbImage("images/samples-sd.png")
+
+
+
+nbText: md"""
+## Trace plots
+"""
+nbCode:
+  ggplot(df, aes("b0")) +
+    geom_histogram() +
+    ggsave("images/hist-b0.png")
+  
+  ggplot(df, aes("b1")) +
+    geom_histogram() +
+    ggsave("images/hist-b1.png")
+  
+  ggplot(df, aes("sd")) +
+    geom_histogram() +
+    ggsave("images/hist-sd.png")
+nbImage("images/hist-b0.png")
+nbImage("images/hist-b1.png")
+nbImage("images/hist-sd.png")
 
 
 nbSave
