@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <title>index.nim</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🐳</text></svg>">
+  <meta content="text/html; charset=utf-8" http-equiv="content-type">
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <link rel='stylesheet' href='https://unpkg.com/normalize.css/'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/light.min.css">
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/pietroppeter/nimib/assets/atom-one-light.css'>
+  <style>
+.nb-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nb-small {
+  font-size: 0.8rem;
+}
+button.nb-small {
+  float: right;
+  padding: 2px;
+  padding-right: 5px;
+  padding-left: 5px;
+}
+section#source {
+  display:none
+}
+</style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.js" integrity="sha384-g7c+Jr9ZivxKLnZTDUhnkOnsh30B4H0rpLUpJ4jAIKs4fnJI+sEnkvrMWph2EDg4" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/contrib/auto-render.min.js" integrity="sha384-mll67QQFJfxn0IYznZYonOWZ644AWYC+Pt2cHqMaRhXVrursRwvLnLaebdGIlYNa" crossorigin="anonymous" onload="renderMathInElement(document.body,{delimiters:[{left: '$$', right: '$$', display: true},{left: '$', right: '$', display: false}]});"></script>
+</head>
+<body>
+<header>
+<div class="nb-box">
+  <span><a href=".">🏡</a></span>
+  <span><code>index.nim</code></span>
+  <span><a href="https://github.com/kerrycobb/nim-bayes"><svg aria-hidden="true" width="1.2em" height="1.2em" style="vertical-align: middle;" preserveAspectRatio="xMidYMid meet" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59c.4.07.55-.17.55-.38c0-.19-.01-.82-.01-1.49c-2.01.37-2.53-.49-2.69-.94c-.09-.23-.48-.94-.82-1.13c-.28-.15-.68-.52-.01-.53c.63-.01 1.08.58 1.23.82c.72 1.21 1.87.87 2.33.66c.07-.52.28-.87.51-1.07c-1.78-.2-3.64-.89-3.64-3.95c0-.87.31-1.59.82-2.15c-.08-.2-.36-1.02.08-2.12c0 0 .67-.21 2.2.82c.64-.18 1.32-.27 2-.27c.68 0 1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82c.44 1.1.16 1.92.08 2.12c.51.56.82 1.27.82 2.15c0 3.07-1.87 3.75-3.65 3.95c.29.25.54.73.54 1.48c0 1.07-.01 1.93-.01 2.2c0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" fill="#000"></path></svg></a></span>
+</div>
+<hr>
+</header><main>
+<h1>Bayesian Inference with Linear Model</h1>
+<p>$ y = \beta_{0} + \beta_{1} x + \epsilon $</p>
+<p>$ \displaystyle p(\beta_{0}, \beta_{1}, \tau | y) =
+\frac{p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)}
+{\iiint d\beta_{0} d\beta_{1} d\tau p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)} $</p>
+<p>$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $</p>
+<h2>Simulate some data:</h2>
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  sequtils, random
+
+<span class="hljs-keyword">var</span>
+  n = <span class="hljs-number">100</span>
+  b0 = <span class="hljs-number">0.0</span>
+  b1 = <span class="hljs-number">1.0</span>
+  sd = <span class="hljs-number">100.0</span>
+  x = newSeq[<span class="hljs-built_in">float</span>](n)
+  y = newSeq[<span class="hljs-built_in">float</span>](n)
+<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n:
+  x[i] = rand(<span class="hljs-number">10.0</span> .. <span class="hljs-number">100.0</span>)
+  y[i] = b0 + b1 * x[i] + gauss(<span class="hljs-number">0.0</span>, sd)</code></pre>
+<h4>Plot the data</h4>
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  datamancer, ggplotnim
+
+<span class="hljs-keyword">var</span> sim = seqsToDf(x, y)
+ggplot(sim, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) + geom_point() + ggsave(<span class="hljs-string">&quot;plots/simulated-data.png&quot;</span>)</code></pre>
+<pre><samp>StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./plots/simulated-data.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<p>Rescale the data:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  stats
+
+<span class="hljs-keyword">let</span>
+  meanX = mean(x)
+  sdX = standardDeviation(x)
+  meanY = mean(y)
+  sdY = standardDeviation(y)
+<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n:
+  x[i] = (x[i] - meanX) / sdX
+ggplot(sim, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) + geom_point() +
+    ggsave(<span class="hljs-string">&quot;plots/simulated-scaled-data.png&quot;</span>)</code></pre>
+<pre><samp>StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./plots/simulated-scaled-data.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<p>The likelihood:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  distributions, math
+
+<span class="hljs-keyword">proc</span> logLikelihood(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
+  <span class="hljs-keyword">var</span> likelihoods = newSeq[<span class="hljs-built_in">float</span>](y.len)
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; y.len:
+    <span class="hljs-keyword">let</span> pred = b0 + b1 * x[i]
+    likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
+  <span class="hljs-literal">result</span> = sum(likelihoods)</code></pre>
+<p>The prior:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> logPrior(b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
+  <span class="hljs-keyword">let</span>
+    b0Prior = ln(initNormalDistribution(<span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>).pdf(b0))
+    b1Prior = ln(initNormalDistribution(<span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>).pdf(b1))
+    sdPrior = ln(initGammaDistribution(<span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>).pdf(<span class="hljs-number">1</span> / sd))
+  <span class="hljs-literal">result</span> = b0Prior + b1Prior + sdPrior</code></pre>
+<p>The posterior:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> logPosterior(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
+  <span class="hljs-keyword">let</span>
+    like = logLikelihood(x = x, y = y, b0 = b0, b1 = b1, sd = sd)
+    prior = logPrior(b0 = b0, b1 = b1, sd = sd)
+  <span class="hljs-literal">result</span> = like + prior</code></pre>
+<p>MCMC:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span>
+  nSamples = <span class="hljs-number">200000</span>
+  b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
+  b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
+  sdSamples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
+b0Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">0.0</span>
+b1Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</span>
+sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">10.0</span>
+<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1</span> .. nSamples:
+  <span class="hljs-keyword">let</span>
+    prevB0 = b0Samples[i - <span class="hljs-number">1</span>]
+    prevB1 = b1Samples[i - <span class="hljs-number">1</span>]
+    prevSd = sdSamples[i - <span class="hljs-number">1</span>]
+    propB0 = gauss(prevB0, <span class="hljs-number">0.3</span>)
+    propB1 = gauss(prevB1, <span class="hljs-number">0.1</span>)
+    propSd = gauss(prevSd, <span class="hljs-number">1.0</span>)
+  <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
+    <span class="hljs-keyword">var</span>
+      prevLogPosterior = logPosterior(x = x, y = y, b0 = prevB0, b1 = prevB1,
+                                      sd = prevSd)
+      propLogPosterior = logPosterior(x = x, y = y, b0 = propB0, b1 = propB1,
+                                      sd = propSd)
+      ratio = exp(propLogPosterior - prevLogPosterior)
+    <span class="hljs-keyword">if</span> rand(<span class="hljs-number">1.0</span>) &lt; ratio:
+      b0Samples[i] = propB0
+      b1Samples[i] = propB1
+      sdSamples[i] = propSd
+    <span class="hljs-keyword">else</span>:
+      b0Samples[i] = prevB0
+      b1Samples[i] = prevB1
+      sdSamples[i] = prevSd
+  <span class="hljs-keyword">else</span>:
+    b0Samples[i] = prevB0
+    b1Samples[i] = prevB1
+    sdSamples[i] = prevSd</code></pre>
+<p>Burnin:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">let</span> burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span></code></pre>
+<p>Posterior means:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
+  meanB0 = mean(b0Samples[burnin ..^ <span class="hljs-number">1</span>])
+  meanB1 = mean(b1Samples[burnin ..^ <span class="hljs-number">1</span>])
+  meanSd = mean(sdSamples[burnin ..^ <span class="hljs-number">1</span>])
+<span class="hljs-keyword">echo</span> meanB0
+<span class="hljs-keyword">echo</span> meanB1
+<span class="hljs-keyword">echo</span> meanSd</code></pre>
+<pre><samp>0.3598809833860596
+1.035745769219971
+108.750426834808
+</samp></pre>
+<p>Highest density interval:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  algorithm
+
+<span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =
+  <span class="hljs-keyword">let</span>
+    sortedSamples = sorted(samples, system.cmp[<span class="hljs-built_in">float</span>])
+    ciIdxInc = <span class="hljs-built_in">int</span>(floor(credMass * <span class="hljs-built_in">float</span>(sortedSamples.len)))
+    nCIs = sortedSamples.len - ciIdxInc
+  <span class="hljs-keyword">var</span> ciWidth = newSeq[<span class="hljs-built_in">float</span>](nCIs)
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nCIs:
+    ciWidth[i] = sortedSamples[i + ciIdxInc] - sortedSamples[i]
+  <span class="hljs-keyword">let</span>
+    minCiWidthIx = minIndex(ciWidth)
+    hdiMin = sortedSamples[minCiWidthIx]
+    hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
+  <span class="hljs-literal">result</span> = (hdiMin, hdiMax)</code></pre>
+<p>The intervals are:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
+  (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+  (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+  (sdHdiMin, sdHdiMax) = hdi(sdSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+<span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
+<span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
+<span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
+<pre><samp>-1.55762945567051 2.312175631403244
+-0.9241667891315187 3.008784133852516
+94.20692936627221 124.064612873941
+</samp></pre>
+<p>Look at the output.
+Trace plots:</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
+  ixs = toSeq(<span class="hljs-number">0</span> ..&lt; b0Samples.len - burnin)
+  df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: ixs, <span class="hljs-string">&quot;b0&quot;</span>: b0Samples[burnin ..^ <span class="hljs-number">1</span>],
+                 <span class="hljs-string">&quot;b1&quot;</span>: b1Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-string">&quot;sd&quot;</span>: sdSamples[burnin ..^ <span class="hljs-number">1</span>]})
+ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;plots/hist-b0.png&quot;</span>)
+ggplot(df, aes(<span class="hljs-string">&quot;b1&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;plots/hist-b1.png&quot;</span>)
+ggplot(df, aes(<span class="hljs-string">&quot;sd&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;plots/hist-sd.png&quot;</span>)</code></pre>
+<pre><samp>StatusSuccess output of write_to_png
+StatusSuccess output of write_to_png
+StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./plots/hist-b0.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./plots/hist-b1.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./plots/hist-sd.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<p>Histograms:</p>
+<pre><code class="nim hljs">ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;plots/samples-b0.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b1&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;plots/samples-b1.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;sd&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;plots/samples-sd.png&quot;</span>)</code></pre>
+<pre><samp>INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./plots/samples-b0.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./plots/samples-b1.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./plots/samples-sd.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+
+</main>
+<footer>
+<hr>
+<div class="nb-box">
+  <span><span class="nb-small">made with <a href="https://pietroppeter.github.io/nimib/">nimib 🐳</a></span></span>
+  <span></span>
+  <span><button class="nb-small" id="show" onclick="toggleSourceDisplay()">Show Source</button></span>
+</div>
+</footer>
+<section id="source">
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span> nimib
+
+nbInit
+nbDoc.useLatex
+nbDoc.context[<span class="hljs-string">&quot;mathjax_support&quot;</span>] = <span class="hljs-literal">true</span>
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Bayesian Inference with Linear Model
+
+$ y = \beta_{0} + \beta_{1} x + \epsilon $
+
+$ \displaystyle p(\beta_{0}, \beta_{1}, \tau | y) = 
+  \frac{p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)}
+  {\iiint d\beta_{0} d\beta_{1} d\tau p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)} $
+
+$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $
+
+
+## Simulate some data:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">import</span> sequtils, random 
+  <span class="hljs-keyword">var</span> 
+    n = <span class="hljs-number">100</span>
+    b0 = <span class="hljs-number">0.0</span>
+    b1 = <span class="hljs-number">1.0</span>
+    sd = <span class="hljs-number">100.0</span>
+    x = newSeq[<span class="hljs-built_in">float</span>](n)
+    y = newSeq[<span class="hljs-built_in">float</span>](n)
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n: 
+    x[i] = rand(<span class="hljs-number">10.0</span>..<span class="hljs-number">100.0</span>) 
+    y[i] = b0 + b1 * x[i] + gauss(<span class="hljs-number">0.0</span>, sd) 
+
+
+<span class="hljs-comment"># Plot data</span>
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+#### Plot the data
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">import</span> datamancer, ggplotnim
+  <span class="hljs-keyword">var</span> sim = seqsToDf(x, y)
+  ggplot(sim, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) +
+    geom_point() +
+    ggsave(<span class="hljs-string">&quot;plots/simulated-data.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/simulated-data.png&quot;</span>)
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+Rescale the data:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">import</span> stats
+  <span class="hljs-keyword">let</span> 
+    meanX = mean(x) 
+    sdX = standardDeviation(x)
+    meanY = mean(y) 
+    sdY = standardDeviation(y)
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n:
+    x[i] = (x[i] - meanX) / sdX 
+  ggplot(sim, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) +
+    geom_point() +
+    ggsave(<span class="hljs-string">&quot;plots/simulated-scaled-data.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/simulated-scaled-data.png&quot;</span>)
+
+
+
+<span class="hljs-comment">## Likelihood</span>
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+The likelihood:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">import</span> distributions, math
+  <span class="hljs-keyword">proc</span> logLikelihood(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
+    <span class="hljs-keyword">var</span> likelihoods = newSeq[<span class="hljs-built_in">float</span>](y.len) 
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;y.len: 
+      <span class="hljs-keyword">let</span> pred = b0 + b1 * x[i]
+      likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
+    <span class="hljs-literal">result</span> = sum(likelihoods) 
+
+
+<span class="hljs-comment">## Prior</span>
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+The prior:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">proc</span> logPrior(b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
+    <span class="hljs-keyword">let</span> 
+      b0Prior = ln(initNormalDistribution(<span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>).pdf(b0))
+      b1Prior = ln(initNormalDistribution(<span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>).pdf(b1))
+      sdPrior = ln(initGammaDistribution(<span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>).pdf(<span class="hljs-number">1</span>/sd))
+    <span class="hljs-literal">result</span> = b0Prior + b1Prior + sdPrior
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+The posterior:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">proc</span> logPosterior(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
+    <span class="hljs-keyword">let</span> 
+      like = logLikelihood(x=x, y=y, b0=b0, b1=b1, sd=sd)
+      prior = logPrior(b0=b0, b1=b1, sd=sd)
+    <span class="hljs-literal">result</span> = like + prior
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+MCMC:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">var</span> 
+    nSamples = <span class="hljs-number">200000</span>
+    b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
+    b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
+    sdSamples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
+
+  b0Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">0.0</span>  
+  b1Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</span> 
+  sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">10.0</span> 
+  
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1.</span>.nSamples:
+    <span class="hljs-keyword">let</span> 
+      prevB0 = b0Samples[i-<span class="hljs-number">1</span>]
+      prevB1 = b1Samples[i-<span class="hljs-number">1</span>]
+      prevSd = sdSamples[i-<span class="hljs-number">1</span>]
+      propB0 = gauss(prevB0, <span class="hljs-number">0.3</span>) 
+      propB1 = gauss(prevB1, <span class="hljs-number">0.1</span>)
+      propSd = gauss(prevSd, <span class="hljs-number">1.0</span>)
+    <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
+      <span class="hljs-keyword">var</span>
+        prevLogPosterior = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
+        propLogPosterior = logPosterior(x=x, y=y, b0=propB0, b1=propB1, sd=propSd) 
+        ratio = exp(propLogPosterior - prevLogPosterior)  
+      <span class="hljs-keyword">if</span> rand(<span class="hljs-number">1.0</span>) &lt; ratio:
+        b0Samples[i] = propB0  
+        b1Samples[i] = propB1  
+        sdSamples[i] = propSd  
+      <span class="hljs-keyword">else</span>: 
+        b0Samples[i] = prevB0  
+        b1Samples[i] = prevB1  
+        sdSamples[i] = prevSd  
+    <span class="hljs-keyword">else</span>:
+      b0Samples[i] = prevB0  
+      b1Samples[i] = prevB1  
+      sdSamples[i] = prevSd  
+
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+Burnin:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">let</span> burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span>
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+Posterior means:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">let</span>
+    meanB0 = mean(b0Samples[burnin..^<span class="hljs-number">1</span>])
+    meanB1 = mean(b1Samples[burnin..^<span class="hljs-number">1</span>])
+    meanSd = mean(sdSamples[burnin..^<span class="hljs-number">1</span>])
+  <span class="hljs-keyword">echo</span> meanB0
+  <span class="hljs-keyword">echo</span> meanB1
+  <span class="hljs-keyword">echo</span> meanSd
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+Highest density interval:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">import</span> algorithm
+  <span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =  
+    <span class="hljs-keyword">let</span> 
+      sortedSamples = sorted(samples, system.cmp[<span class="hljs-built_in">float</span>])
+      ciIdxInc = <span class="hljs-built_in">int</span>(floor(credMass * <span class="hljs-built_in">float</span>(sortedSamples.len)))
+      nCIs = sortedSamples.len - ciIdxInc
+    <span class="hljs-keyword">var</span> ciWidth = newSeq[<span class="hljs-built_in">float</span>](nCIs)
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;nCIs:
+      ciWidth[i] = sortedSamples[i + ciIdxInc] - sortedSamples[i]
+    <span class="hljs-keyword">let</span>
+      minCiWidthIx = minIndex(ciWidth)
+      hdiMin = sortedSamples[minCiWidthIx]
+      hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
+    <span class="hljs-literal">result</span> = (hdiMin, hdiMax)
+
+nbText: <span class="hljs-string">&quot;The intervals are:&quot;</span>
+nbCode:
+  <span class="hljs-keyword">let</span> 
+    (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+    (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+    (sdHdiMin, sdHdiMax) = hdi(sdSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+  <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
+  <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
+  <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+Look at the output.
+Trace plots:
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">let</span> 
+    ixs = toSeq(<span class="hljs-number">0</span> ..&lt; b0Samples.len-burnin)
+    df = seqsToDf({
+      <span class="hljs-string">&quot;ixs&quot;</span>:ixs, 
+      <span class="hljs-string">&quot;b0&quot;</span>:b0Samples[burnin..^<span class="hljs-number">1</span>],
+      <span class="hljs-string">&quot;b1&quot;</span>:b1Samples[burnin..^<span class="hljs-number">1</span>],
+      <span class="hljs-string">&quot;sd&quot;</span>:sdSamples[burnin..^<span class="hljs-number">1</span>]})
+  ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;plots/hist-b0.png&quot;</span>)
+  
+  ggplot(df, aes(<span class="hljs-string">&quot;b1&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;plots/hist-b1.png&quot;</span>)
+  
+  ggplot(df, aes(<span class="hljs-string">&quot;sd&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;plots/hist-sd.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/hist-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/hist-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/hist-sd.png&quot;</span>)
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+Histograms:
+&quot;&quot;&quot;</span>
+nbCode:
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b0&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;plots/samples-b0.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b1&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;plots/samples-b1.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;sd&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;plots/samples-sd.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/samples-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/samples-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;plots/samples-sd.png&quot;</span>)
+
+
+nbSave</code></pre>
+</section><script>
+function toggleSourceDisplay() {
+  var btn = document.getElementById("show")
+  var source = document.getElementById("source");
+  if (btn.innerHTML=="Show Source") {
+    btn.innerHTML = "Hide Source";
+    source.style.display = "block";
+  } else {
+    btn.innerHTML = "Show Source";
+    source.style.display = "none";
+  }
+}
+</script></body>
+</html>

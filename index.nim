@@ -6,7 +6,7 @@ nbDoc.context["mathjax_support"] = true
 
 
 nbText: md"""
-# Linear Model
+# Bayesian Inference with Linear Model
 
 $ y = \beta_{0} + \beta_{1} x + \epsilon $
 
@@ -17,7 +17,7 @@ $ \displaystyle p(\beta_{0}, \beta_{1}, \tau | y) =
 $ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $
 
 
-Simulate some data:
+## Generate Data
 """
 nbCode:
   import sequtils, random 
@@ -35,19 +35,19 @@ nbCode:
 
 # Plot data
 nbText: md"""
-Plot the data
+#### Plot Data
 """
 nbCode:
   import datamancer, ggplotnim
   var sim = seqsToDf(x, y)
   ggplot(sim, aes("x", "y")) +
     geom_point() +
-    ggsave("plots/simulated-data.png")
-nbImage("plots/simulated-data.png")
+    ggsave("images/simulated-data.png")
+nbImage("images/simulated-data.png")
 
 
 nbText: md"""
-Rescale the data:
+#### Rescale Data
 """
 nbCode:
   import stats
@@ -60,14 +60,14 @@ nbCode:
     x[i] = (x[i] - meanX) / sdX 
   ggplot(sim, aes("x", "y")) +
     geom_point() +
-    ggsave("plots/simulated-scaled-data.png")
-nbImage("plots/simulated-scaled-data.png")
+    ggsave("images/simulated-scaled-data.png")
+nbImage("images/simulated-scaled-data.png")
 
 
 
 ## Likelihood
 nbText: md"""
-The likelihood:
+### Likelihood:
 """
 nbCode:
   import distributions, math
@@ -81,7 +81,7 @@ nbCode:
 
 ## Prior
 nbText: md"""
-The prior:
+### Prior
 """
 nbCode:
   proc logPrior(b0, b1, sd: float): float = 
@@ -93,7 +93,7 @@ nbCode:
 
 
 nbText: md"""
-The posterior:
+### Posterior
 """
 nbCode:
   proc logPosterior(x, y: seq[float], b0, b1, sd: float): float = 
@@ -104,7 +104,7 @@ nbCode:
 
 
 nbText: md"""
-MCMC:
+### MCMC
 """
 nbCode:
   var 
@@ -146,14 +146,14 @@ nbCode:
 
 
 nbText: md"""
-Burnin:
+#### Burnin
 """
 nbCode:
   let burnin = (nSamples.float * 0.1 + 1).int
 
 
 nbText: md"""
-Posterior means:
+##### Posterior means
 """
 nbCode:
   let
@@ -166,7 +166,7 @@ nbCode:
 
 
 nbText: md"""
-Highest density interval:
+### Highest density interval
 """
 nbCode:
   import algorithm
@@ -209,18 +209,18 @@ nbCode:
       "sd":sdSamples[burnin..^1]})
   ggplot(df, aes("b0")) +
     geom_histogram() +
-    ggsave("plots/hist-b0.png")
+    ggsave("images/hist-b0.png")
   
   ggplot(df, aes("b1")) +
     geom_histogram() +
-    ggsave("plots/hist-b1.png")
+    ggsave("images/hist-b1.png")
   
   ggplot(df, aes("sd")) +
     geom_histogram() +
-    ggsave("plots/hist-sd.png")
-nbImage("plots/hist-b0.png")
-nbImage("plots/hist-b1.png")
-nbImage("plots/hist-sd.png")
+    ggsave("images/hist-sd.png")
+nbImage("images/hist-b0.png")
+nbImage("images/hist-b1.png")
+nbImage("images/hist-sd.png")
 
 
 nbText: md"""
@@ -229,18 +229,18 @@ Histograms:
 nbCode:
   ggplot(df, aes(x="ixs", y="b0")) + 
     geom_line() +
-    ggsave("plots/samples-b0.png")
+    ggsave("images/samples-b0.png")
   
   ggplot(df, aes(x="ixs", y="b1")) + 
     geom_line() +
-    ggsave("plots/samples-b1.png")
+    ggsave("images/samples-b1.png")
   
   ggplot(df, aes(x="ixs", y="sd")) + 
     geom_line() +
-    ggsave("plots/samples-sd.png")
-nbImage("plots/samples-b0.png")
-nbImage("plots/samples-b1.png")
-nbImage("plots/samples-sd.png")
+    ggsave("images/samples-sd.png")
+nbImage("images/samples-b0.png")
+nbImage("images/samples-b1.png")
+nbImage("images/samples-sd.png")
 
 
 nbSave
