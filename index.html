@@ -41,16 +41,49 @@ section#source {
 <hr>
 </header><main>
 <h1>Bayesian Inference with Linear Model</h1>
-<p>$ y = \beta_{0} + \beta_{1} x + \epsilon $</p>
-<p>$ \displaystyle p(\beta_{0}, \beta_{1}, \tau | y) =
-\frac{p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)}
-{\iiint d\beta_{0} d\beta_{1} d\tau p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)} $</p>
-<p>$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $</p>
-<h2>Generate Data</h2>
+<p>At the time of this writing, Nim does not have any libraries for
+conducting Bayesian inference. However, Nim makes it quite easy for us to
+write all of the necessary code ourselves. This is also a good exercise for
+learning about Bayesian inference and Nim's syntax and speed make it perfect
+for this. We will assume that you have some basic understanding of Bayesian
+inference already. There are many excellent introductions available in books
+and online.</p>
+<p>For a quick refresher, Bayes rule can be written as:</p>
+<p>$$ P(\theta|\text{Data}) = \frac{P(\text{Data}|\theta)P(\theta)}{\sum_{\theta}P(\text{Data}|\theta)P(\theta)}$$</p>
+<p>Where each of these terms are referred to as:</p>
+<p>$$ \text{Posterior} = \frac{\text{Likelihood} \cdot \text{Prior}}{\text{Marginal Likelihood}}$$</p>
+<p>In this tutorial we will condsider a simple linear model
+$ y_{i} = \beta_{0} + \beta_{1} x_{i} + \epsilon_{i} $ where the parameters
+$\beta_0$ (y intercept), $\beta_1$ (slope), and $\epsilon$ (random error)
+describe the relationship between a predictor variable $x$ and a response
+variable $y$, with some unaccounted for residual ranodom error that
+is normally distributed.</p>
+<p>We well estimate the values of the slope ($\beta_{0}$), the y-intercept
+($\beta_{1}$), and the standard deviation of the normally distributed random
+error which we will call $\tau$.</p>
+<p>We can express this using Bayes rule:</p>
+<p>$$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) =
+\frac{P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)}
+{\iiint d\beta_{0} d\beta_{1} d\tau P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)} $$</p>
+<!-- For our model we will assume: 
+$$ y \sim N(\mu, \tau)$$
+$$\mu = \beta_{0} +\beta_{1} x$$
+$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$ 
+$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$ 
+$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$  -->
+<!-- For the marginal we need to sum over the probabilities of the data for all -->
+<!-- possible values under our priors.   -->
+<!-- We don't want to have to solve this analytically so we can approximate the posterior
+distribution with markov chain monte carlo (MCMC) simulation since as you will 
+see below. -->
+<!-- $$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $$ -->
+<h1>Generate Data</h1>
+<p>We need some data to work with. Lets simulate data<br />
+under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, 1)$ with
+$\beta_{0}=0$ $\beta_{1}=1$ and $\tau=1$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
-  sequtils, random
+  std / sequtils, std / random
 
-randomize()
 <span class="hljs-keyword">var</span>
   n = <span class="hljs-number">100</span>
   b0 = <span class="hljs-number">0.0</span>
@@ -59,9 +92,9 @@ randomize()
   x = newSeq[<span class="hljs-built_in">float</span>](n)
   y = newSeq[<span class="hljs-built_in">float</span>](n)
 <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n:
-  x[i] = rand(<span class="hljs-number">0.0</span> .. <span class="hljs-number">100.0</span>)
+  x[i] = rand(<span class="hljs-number">10.0</span> .. <span class="hljs-number">100.0</span>)
   y[i] = b0 + b1 * x[i] + gauss(<span class="hljs-number">0.0</span>, sd)</code></pre>
-<h4>Plot Data</h4>
+<p>We can use <code>ggplotnim</code> to see what these data look like.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
   datamancer, ggplotnim
 
@@ -74,30 +107,63 @@ ggplot(sim, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hlj
 <figcaption></figcaption>
 </figure>
 
-<h2>Likelihood</h2>
+<h1>Prior</h1>
+<p>Prior probabilities are central to Bayesian inference. We need to choose
+prior probability distributions for each of the parameters that we are
+estimating. We then need to be able to calculate the probability for a proposed
+parameter value under the chosen probability distribution. Let's use a normal
+distribution for the priors on $\beta_{0}$ and $\beta_{1}$ since these parameters
+can take any value. We will use a gamma distribution for the prior on $\tau$
+since it must have a value greater than 0.</p>
+<p>$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$
+$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$
+$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$</p>
+<p>Since this tutorial is for the purpose of demonstration, let's use very informed
+priors so that we can get a good sample from the posterior more quickly.</p>
+<p>$$ \beta_{0} \sim Normal(0, 1)$$
+$$ \beta_{1} \sim Normal(1, 1)$$
+$$ \tau \sim Gamma(1, 1)$$</p>
+<p>We will actually be using the $ln$ of the probabilities in thie tutorial to
+reduce rounding error since these values can be quite small.</p>
+<p>To calculate the prior probabilities for proposed parameter values we make use
+of the <code>distributions</code> package.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
-  distributions, math
+  distributions, std / math
 
-<span class="hljs-keyword">proc</span> logLikelihood(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
-  <span class="hljs-keyword">var</span> likelihoods = newSeq[<span class="hljs-built_in">float</span>](y.len)
-  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; y.len:
-    <span class="hljs-keyword">let</span> pred = b0 + b1 * x[i]
-    likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
-  <span class="hljs-literal">result</span> = sum(likelihoods)</code></pre>
-<h2>Prior</h2>
-<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> logPrior(b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
+<span class="hljs-keyword">proc</span> logPrior(b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
   <span class="hljs-keyword">let</span>
     b0Prior = ln(initNormalDistribution(<span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>).pdf(b0))
     b1Prior = ln(initNormalDistribution(<span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>).pdf(b1))
     sdPrior = ln(initGammaDistribution(<span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>).pdf(<span class="hljs-number">1</span> / sd))
   <span class="hljs-literal">result</span> = b0Prior + b1Prior + sdPrior</code></pre>
-<h2>Posterior</h2>
+<h1>Likelihood</h1>
+<p>We need to be able to calculate the likelihood of the observed $y_{i}$ values
+given the observed $x_{i}$ values and proposed parameter values for $\beta_{0}$,
+$\beta_{1}$, and $\tau$.</p>
+<p>$$\mu = \beta_{0} +\beta_{1} x$$
+$$ y \sim N(\mu, \tau)$$</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> logLikelihood(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
+  <span class="hljs-keyword">var</span> likelihoods = newSeq[<span class="hljs-built_in">float</span>](y.len)
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; y.len:
+    <span class="hljs-keyword">let</span> pred = b0 + b1 * x[i]
+    likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
+  <span class="hljs-literal">result</span> = sum(likelihoods)</code></pre>
+<h1>Posterior</h1>
+<p>We cannot analytically solve the posterior probability distribution but we can
+approximate it with mcmc. To do this we will compute the posterior probability
+for each mcmc sample again using the $ln$.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">proc</span> logPosterior(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
   <span class="hljs-keyword">let</span>
     like = logLikelihood(x = x, y = y, b0 = b0, b1 = b1, sd = sd)
     prior = logPrior(b0 = b0, b1 = b1, sd = sd)
   <span class="hljs-literal">result</span> = like + prior</code></pre>
-<h2>MCMC</h2>
+<h1>MCMC</h1>
+<p>We will use a Metropolis-Hastings algorithm to approximate the posterior.</p>
+<ol>
+<li>Choose starting values</li>
+<li>Propose a new parameter value close to the previous one.</li>
+<li>Accept the proposed parameter value with probability ...</li>
+</ol>
 <pre><code class="nim hljs"><span class="hljs-keyword">var</span>
   nSamples = <span class="hljs-number">200000</span>
   b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
@@ -111,8 +177,8 @@ sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</s
     prevB0 = b0Samples[i - <span class="hljs-number">1</span>]
     prevB1 = b1Samples[i - <span class="hljs-number">1</span>]
     prevSd = sdSamples[i - <span class="hljs-number">1</span>]
-    propB0 = gauss(prevB0, <span class="hljs-number">0.1</span>)
-    propB1 = gauss(prevB1, <span class="hljs-number">0.1</span>)
+    propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>)
+    propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
     propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
   <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
     <span class="hljs-keyword">var</span>
@@ -133,9 +199,16 @@ sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</s
     b0Samples[i] = prevB0
     b1Samples[i] = prevB1
     sdSamples[i] = prevSd</code></pre>
-<h4>Burnin</h4>
+<h1>Burnin</h1>
+<p>Initially the mcmc chain may spend a lot of time exploring unlikely regions
+parameter space. We can get a better approximation of the posterior if we
+exclude these early steps in the chain. These excluded samples are referred to<br />
+as the burnin. A burnin of $10%$ seems to work well with our informative priors
+and starting values.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">let</span> burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span></code></pre>
-<h4>Posterior means</h4>
+<h1>Posterior means</h1>
+<p>One way to summarize the estimates from the posterior distribution is to calculate
+the mean. Let's see how close these values are to the true means.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
   stats
 
@@ -146,11 +219,14 @@ sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</s
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.2186593643404479
-1.003584071791399
-1.065344512936642
+<pre><samp>-0.3972981901305042
+1.003129738959811
+0.9975660889123292
 </samp></pre>
-<h2>Highest density interval</h2>
+<h1>Highest density interval</h1>
+<p>The means give us a point estimate for our parameter values but they tell us
+nothing about the uncertainty of our estimate. We can get a sense for that by
+looking at the highest density interval.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
   algorithm
 
@@ -166,20 +242,26 @@ sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</s
     minCiWidthIx = minIndex(ciWidth)
     hdiMin = sortedSamples[minCiWidthIx]
     hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
-  <span class="hljs-literal">result</span> = (hdiMin, hdiMax)</code></pre>
-<h4>The intervals</h4>
-<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
+  <span class="hljs-literal">result</span> = (hdiMin, hdiMax)
+
+<span class="hljs-keyword">let</span>
   (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
   (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
   (sdHdiMin, sdHdiMax) = hdi(sdSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.7248780823432855 0.2659169870363585
-0.9957896379180181 1.011517249481638
-0.9204724991353965 1.219589602026548
+<pre><samp>-0.8241005228624089 0.006971099185924735
+0.9958153191058512 1.010317764363869
+0.8696065250887538 1.139423189156465
 </samp></pre>
-<h2>Histograms</h2>
+<h1>Trace plots</h1>
+<p>We can get a sense for how well our mcmc performed and therefore gain some<br />
+sense for how good our estimates might be by looking at the trace plot which
+shows the parameter value store during each step in the mcmc chain. Either
+the accepted proposal or the previous one if the a proposal is rejected. Trace
+plots can be unreliable for confirming good mcmc performance so it is a good<br />
+idea to assess this with other methods as well.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">let</span>
   ixs = toSeq(<span class="hljs-number">0</span> ..&lt; b0Samples.len - burnin)
   df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: ixs, <span class="hljs-string">&quot;b0&quot;</span>: b0Samples[burnin ..^ <span class="hljs-number">1</span>],
@@ -212,7 +294,7 @@ StatusSuccess output of write_to_png
 <figcaption></figcaption>
 </figure>
 
-<h2>Trace plots</h2>
+<h1>Histograms</h1>
 <pre><code class="nim hljs">ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
 ggplot(df, aes(<span class="hljs-string">&quot;b1&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
 ggplot(df, aes(<span class="hljs-string">&quot;sd&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)</code></pre>
@@ -250,26 +332,71 @@ StatusSuccess output of write_to_png
 
 nbInit
 nbDoc.useLatex
-nbDoc.context[<span class="hljs-string">&quot;mathjax_support&quot;</span>] = <span class="hljs-literal">true</span>
-
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Bayesian Inference with Linear Model
 
-$ y = \beta_{0} + \beta_{1} x + \epsilon $
+At the time of this writing, Nim does not have any libraries for
+conducting Bayesian inference. However, Nim makes it quite easy for us to
+write all of the necessary code ourselves. This is also a good exercise for
+learning about Bayesian inference and Nim's syntax and speed make it perfect
+for this. We will assume that you have some basic understanding of Bayesian
+inference already. There are many excellent introductions available in books
+and online.
 
-$ \displaystyle p(\beta_{0}, \beta_{1}, \tau | y) = 
-  \frac{p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)}
-  {\iiint d\beta_{0} d\beta_{1} d\tau p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)} $
+For a quick refresher, Bayes rule can be written as:
 
-$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $
+$$ P(\theta|\text{Data}) = \frac{P(\text{Data}|\theta)P(\theta)}{\sum_{\theta}P(\text{Data}|\theta)P(\theta)}$$
+
+Where each of these terms are referred to as:
+
+$$ \text{Posterior} = \frac{\text{Likelihood} \cdot \text{Prior}}{\text{Marginal Likelihood}}$$
+
+In this tutorial we will condsider a simple linear model 
+$ y_{i} = \beta_{0} + \beta_{1} x_{i} + \epsilon_{i} $ where the parameters
+$\beta_0$ (y intercept), $\beta_1$ (slope), and $\epsilon$ (random error)
+describe the relationship between a predictor variable $x$ and a response
+variable $y$, with some unaccounted for residual ranodom error that 
+is normally distributed. 
+
+We well estimate the values of the slope ($\beta_{0}$), the y-intercept 
+($\beta_{1}$), and the standard deviation of the normally distributed random
+error which we will call $\tau$.
+
+We can express this using Bayes rule:
+
+$$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) =
+  \frac{P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)}
+  {\iiint d\beta_{0} d\beta_{1} d\tau P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)} $$
 
 
-## Generate Data
+
+&lt;!-- For our model we will assume: 
+$$ y \sim N(\mu, \tau)$$
+$$\mu = \beta_{0} +\beta_{1} x$$
+$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$ 
+$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$ 
+$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$  --&gt;
+
+
+&lt;!-- For the marginal we need to sum over the probabilities of the data for all --&gt;
+&lt;!-- possible values under our priors.   --&gt;
+
+&lt;!-- We don't want to have to solve this analytically so we can approximate the posterior
+distribution with markov chain monte carlo (MCMC) simulation since as you will 
+see below. --&gt;
+
+&lt;!-- $$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $$ --&gt;
+
+
+# Generate Data
+We need some data to work with. Lets simulate data  
+under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, 1)$ with 
+$\beta_{0}=0$ $\beta_{1}=1$ and $\tau=1$
 &quot;&quot;&quot;</span>
 nbCode:
-  <span class="hljs-keyword">import</span> sequtils, random 
-  randomize()
+  <span class="hljs-keyword">import</span> std/sequtils, std/random 
+  <span class="hljs-comment"># randomize()</span>
   <span class="hljs-keyword">var</span> 
     n = <span class="hljs-number">100</span>
     b0 = <span class="hljs-number">0.0</span>
@@ -278,12 +405,12 @@ nbCode:
     x = newSeq[<span class="hljs-built_in">float</span>](n)
     y = newSeq[<span class="hljs-built_in">float</span>](n)
   <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n: 
-    x[i] = rand(<span class="hljs-number">0.0</span>..<span class="hljs-number">100.0</span>) 
+    x[i] = rand(<span class="hljs-number">10.0</span>..<span class="hljs-number">100.0</span>) 
     y[i] = b0 + b1 * x[i] + gauss(<span class="hljs-number">0.0</span>, sd) 
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-#### Plot Data
+We can use `ggplotnim` to see what these data look like.
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">import</span> datamancer, ggplotnim
@@ -295,22 +422,34 @@ nbImage(<span class="hljs-string">&quot;images/simulated-data.png&quot;</span>)
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-## Likelihood
+# Prior
+Prior probabilities are central to Bayesian inference. We need to choose
+prior probability distributions for each of the parameters that we are
+estimating. We then need to be able to calculate the probability for a proposed
+parameter value under the chosen probability distribution. Let's use a normal
+distribution for the priors on $\beta_{0}$ and $\beta_{1}$ since these parameters
+can take any value. We will use a gamma distribution for the prior on $\tau$
+since it must have a value greater than 0.
+
+$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$
+$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$
+$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$
+
+Since this tutorial is for the purpose of demonstration, let's use very informed
+priors so that we can get a good sample from the posterior more quickly.
+
+$$ \beta_{0} \sim Normal(0, 1)$$
+$$ \beta_{1} \sim Normal(1, 1)$$
+$$ \tau \sim Gamma(1, 1)$$
+
+We will actually be using the $ln$ of the probabilities in thie tutorial to
+reduce rounding error since these values can be quite small.
+
+To calculate the prior probabilities for proposed parameter values we make use
+of the `distributions` package.
 &quot;&quot;&quot;</span>
 nbCode:
-  <span class="hljs-keyword">import</span> distributions, math
-  <span class="hljs-keyword">proc</span> logLikelihood(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
-    <span class="hljs-keyword">var</span> likelihoods = newSeq[<span class="hljs-built_in">float</span>](y.len) 
-    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;y.len: 
-      <span class="hljs-keyword">let</span> pred = b0 + b1 * x[i]
-      likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
-    <span class="hljs-literal">result</span> = sum(likelihoods) 
-
-
-nbText: <span class="hljs-string">md&quot;&quot;&quot;
-## Prior
-&quot;&quot;&quot;</span>
-nbCode:
+  <span class="hljs-keyword">import</span> distributions, std/math
   <span class="hljs-keyword">proc</span> logPrior(b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
     <span class="hljs-keyword">let</span> 
       b0Prior = ln(initNormalDistribution(<span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>).pdf(b0))
@@ -320,7 +459,29 @@ nbCode:
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-## Posterior
+# Likelihood
+We need to be able to calculate the likelihood of the observed $y_{i}$ values
+given the observed $x_{i}$ values and proposed parameter values for $\beta_{0}$, 
+$\beta_{1}$, and $\tau$. 
+
+$$\mu = \beta_{0} +\beta_{1} x$$
+$$ y \sim N(\mu, \tau)$$
+
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">proc</span> logLikelihood(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
+    <span class="hljs-keyword">var</span> likelihoods = newSeq[<span class="hljs-built_in">float</span>](y.len) 
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;y.len: 
+      <span class="hljs-keyword">let</span> pred = b0 + b1 * x[i]
+      likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
+    <span class="hljs-literal">result</span> = sum(likelihoods) 
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Posterior
+We cannot analytically solve the posterior probability distribution but we can
+approximate it with mcmc. To do this we will compute the posterior probability
+for each mcmc sample again using the $ln$. 
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">proc</span> logPosterior(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
@@ -331,7 +492,11 @@ nbCode:
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-## MCMC
+# MCMC
+We will use a Metropolis-Hastings algorithm to approximate the posterior. 
+1) Choose starting values
+2) Propose a new parameter value close to the previous one.
+3) Accept the proposed parameter value with probability ...
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">var</span> 
@@ -349,8 +514,8 @@ nbCode:
       prevB0 = b0Samples[i-<span class="hljs-number">1</span>]
       prevB1 = b1Samples[i-<span class="hljs-number">1</span>]
       prevSd = sdSamples[i-<span class="hljs-number">1</span>]
-      propB0 = gauss(prevB0, <span class="hljs-number">0.1</span>) 
-      propB1 = gauss(prevB1, <span class="hljs-number">0.1</span>)
+      propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>) 
+      propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
       propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
     <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
       <span class="hljs-keyword">var</span>
@@ -372,14 +537,21 @@ nbCode:
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-#### Burnin
+# Burnin
+Initially the mcmc chain may spend a lot of time exploring unlikely regions 
+parameter space. We can get a better approximation of the posterior if we 
+exclude these early steps in the chain. These excluded samples are referred to   
+as the burnin. A burnin of $10%$ seems to work well with our informative priors 
+and starting values. 
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">let</span> burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span>
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-#### Posterior means
+# Posterior means
+One way to summarize the estimates from the posterior distribution is to calculate
+the mean. Let's see how close these values are to the true means. 
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">import</span> stats
@@ -393,7 +565,10 @@ nbCode:
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-## Highest density interval
+# Highest density interval
+The means give us a point estimate for our parameter values but they tell us 
+nothing about the uncertainty of our estimate. We can get a sense for that by 
+looking at the highest density interval. 
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">import</span> algorithm
@@ -411,11 +586,6 @@ nbCode:
       hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
     <span class="hljs-literal">result</span> = (hdiMin, hdiMax)
 
-
-nbText: <span class="hljs-string">md&quot;&quot;&quot;
-#### The intervals
-&quot;&quot;&quot;</span>
-nbCode:
   <span class="hljs-keyword">let</span> 
     (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
     (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
@@ -426,7 +596,13 @@ nbCode:
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-## Histograms
+# Trace plots 
+We can get a sense for how well our mcmc performed and therefore gain some  
+sense for how good our estimates might be by looking at the trace plot which 
+shows the parameter value store during each step in the mcmc chain. Either 
+the accepted proposal or the previous one if the a proposal is rejected. Trace
+plots can be unreliable for confirming good mcmc performance so it is a good  
+idea to assess this with other methods as well. 
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">let</span> 
@@ -454,7 +630,8 @@ nbImage(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-## Trace plots
+# Histograms 
+
 &quot;&quot;&quot;</span>
 nbCode:
   ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) +
@@ -472,6 +649,14 @@ nbImage(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)
 
+
+<span class="hljs-comment"># nbText: md&quot;&quot;&quot;</span>
+<span class="hljs-comment"># # Final Note </span>
+<span class="hljs-comment"># Of course we could have simply and more efficiently done this using least squares regression.</span>
+<span class="hljs-comment"># However the Bayesian approach allows us to very easily and intuitively express</span>
+<span class="hljs-comment"># uncertainty about our estimates and can be easily extended to much more complex </span>
+<span class="hljs-comment"># models for which there are not such simple solutions.</span>
+<span class="hljs-comment"># &quot;&quot;&quot;</span>
 
 nbSave</code></pre>
 </section><script>

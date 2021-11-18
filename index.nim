@@ -2,26 +2,71 @@ import nimib
 
 nbInit
 nbDoc.useLatex
-nbDoc.context["mathjax_support"] = true
-
 
 nbText: md"""
 # Bayesian Inference with Linear Model
 
-$ y = \beta_{0} + \beta_{1} x + \epsilon $
+At the time of this writing, Nim does not have any libraries for
+conducting Bayesian inference. However, Nim makes it quite easy for us to
+write all of the necessary code ourselves. This is also a good exercise for
+learning about Bayesian inference and Nim's syntax and speed make it perfect
+for this. We will assume that you have some basic understanding of Bayesian
+inference already. There are many excellent introductions available in books
+and online.
 
-$ \displaystyle p(\beta_{0}, \beta_{1}, \tau | y) = 
-  \frac{p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)}
-  {\iiint d\beta_{0} d\beta_{1} d\tau p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau)} $
+For a quick refresher, Bayes rule can be written as:
 
-$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $
+$$ P(\theta|\text{Data}) = \frac{P(\text{Data}|\theta)P(\theta)}{\sum_{\theta}P(\text{Data}|\theta)P(\theta)}$$
+
+Where each of these terms are referred to as:
+
+$$ \text{Posterior} = \frac{\text{Likelihood} \cdot \text{Prior}}{\text{Marginal Likelihood}}$$
+
+In this tutorial we will condsider a simple linear model 
+$ y_{i} = \beta_{0} + \beta_{1} x_{i} + \epsilon_{i} $ where the parameters
+$\beta_0$ (y intercept), $\beta_1$ (slope), and $\epsilon$ (random error)
+describe the relationship between a predictor variable $x$ and a response
+variable $y$, with some unaccounted for residual ranodom error that 
+is normally distributed. 
+
+We well estimate the values of the slope ($\beta_{0}$), the y-intercept 
+($\beta_{1}$), and the standard deviation of the normally distributed random
+error which we will call $\tau$.
+
+We can express this using Bayes rule:
+
+$$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) =
+  \frac{P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)}
+  {\iiint d\beta_{0} d\beta_{1} d\tau P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)} $$
 
 
-## Generate Data
+
+<!-- For our model we will assume: 
+$$ y \sim N(\mu, \tau)$$
+$$\mu = \beta_{0} +\beta_{1} x$$
+$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$ 
+$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$ 
+$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$  -->
+
+
+<!-- For the marginal we need to sum over the probabilities of the data for all -->
+<!-- possible values under our priors.   -->
+
+<!-- We don't want to have to solve this analytically so we can approximate the posterior
+distribution with markov chain monte carlo (MCMC) simulation since as you will 
+see below. -->
+
+<!-- $$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $$ -->
+
+
+# Generate Data
+We need some data to work with. Lets simulate data  
+under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, 1)$ with 
+$\beta_{0}=0$ $\beta_{1}=1$ and $\tau=1$
 """
 nbCode:
-  import sequtils, random 
-  randomize()
+  import std/sequtils, std/random 
+  # randomize()
   var 
     n = 100
     b0 = 0.0
@@ -30,12 +75,12 @@ nbCode:
     x = newSeq[float](n)
     y = newSeq[float](n)
   for i in 0 ..< n: 
-    x[i] = rand(0.0..100.0) 
+    x[i] = rand(10.0..100.0) 
     y[i] = b0 + b1 * x[i] + gauss(0.0, sd) 
 
 
 nbText: md"""
-#### Plot Data
+We can use `ggplotnim` to see what these data look like.
 """
 nbCode:
   import datamancer, ggplotnim
@@ -47,22 +92,34 @@ nbImage("images/simulated-data.png")
 
 
 nbText: md"""
-## Likelihood
+# Prior
+Prior probabilities are central to Bayesian inference. We need to choose
+prior probability distributions for each of the parameters that we are
+estimating. We then need to be able to calculate the probability for a proposed
+parameter value under the chosen probability distribution. Let's use a normal
+distribution for the priors on $\beta_{0}$ and $\beta_{1}$ since these parameters
+can take any value. We will use a gamma distribution for the prior on $\tau$
+since it must have a value greater than 0.
+
+$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$
+$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$
+$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$
+
+Since this tutorial is for the purpose of demonstration, let's use very informed
+priors so that we can get a good sample from the posterior more quickly.
+
+$$ \beta_{0} \sim Normal(0, 1)$$
+$$ \beta_{1} \sim Normal(1, 1)$$
+$$ \tau \sim Gamma(1, 1)$$
+
+We will actually be using the $ln$ of the probabilities in thie tutorial to
+reduce rounding error since these values can be quite small.
+
+To calculate the prior probabilities for proposed parameter values we make use
+of the `distributions` package.
 """
 nbCode:
-  import distributions, math
-  proc logLikelihood(x, y: seq[float], b0, b1, sd: float): float = 
-    var likelihoods = newSeq[float](y.len) 
-    for i in 0..<y.len: 
-      let pred = b0 + b1 * x[i]
-      likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
-    result = sum(likelihoods) 
-
-
-nbText: md"""
-## Prior
-"""
-nbCode:
+  import distributions, std/math
   proc logPrior(b0, b1, sd: float): float = 
     let 
       b0Prior = ln(initNormalDistribution(0.0, 1.0).pdf(b0))
@@ -72,7 +129,29 @@ nbCode:
 
 
 nbText: md"""
-## Posterior
+# Likelihood
+We need to be able to calculate the likelihood of the observed $y_{i}$ values
+given the observed $x_{i}$ values and proposed parameter values for $\beta_{0}$, 
+$\beta_{1}$, and $\tau$. 
+
+$$\mu = \beta_{0} +\beta_{1} x$$
+$$ y \sim N(\mu, \tau)$$
+
+"""
+nbCode:
+  proc logLikelihood(x, y: seq[float], b0, b1, sd: float): float = 
+    var likelihoods = newSeq[float](y.len) 
+    for i in 0..<y.len: 
+      let pred = b0 + b1 * x[i]
+      likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
+    result = sum(likelihoods) 
+
+
+nbText: md"""
+# Posterior
+We cannot analytically solve the posterior probability distribution but we can
+approximate it with mcmc. To do this we will compute the posterior probability
+for each mcmc sample again using the $ln$. 
 """
 nbCode:
   proc logPosterior(x, y: seq[float], b0, b1, sd: float): float = 
@@ -83,7 +162,11 @@ nbCode:
 
 
 nbText: md"""
-## MCMC
+# MCMC
+We will use a Metropolis-Hastings algorithm to approximate the posterior. 
+1) Choose starting values
+2) Propose a new parameter value close to the previous one.
+3) Accept the proposed parameter value with probability ...
 """
 nbCode:
   var 
@@ -101,8 +184,8 @@ nbCode:
       prevB0 = b0Samples[i-1]
       prevB1 = b1Samples[i-1]
       prevSd = sdSamples[i-1]
-      propB0 = gauss(prevB0, 0.1) 
-      propB1 = gauss(prevB1, 0.1)
+      propB0 = gauss(prevB0, 0.2) 
+      propB1 = gauss(prevB1, 0.2)
       propSd = gauss(prevSd, 0.1)
     if propSd > 0.0:
       var
@@ -124,14 +207,21 @@ nbCode:
 
 
 nbText: md"""
-#### Burnin
+# Burnin
+Initially the mcmc chain may spend a lot of time exploring unlikely regions 
+parameter space. We can get a better approximation of the posterior if we 
+exclude these early steps in the chain. These excluded samples are referred to   
+as the burnin. A burnin of $10%$ seems to work well with our informative priors 
+and starting values. 
 """
 nbCode:
   let burnin = (nSamples.float * 0.1 + 1).int
 
 
 nbText: md"""
-#### Posterior means
+# Posterior means
+One way to summarize the estimates from the posterior distribution is to calculate
+the mean. Let's see how close these values are to the true means. 
 """
 nbCode:
   import stats
@@ -145,7 +235,10 @@ nbCode:
 
 
 nbText: md"""
-## Highest density interval
+# Highest density interval
+The means give us a point estimate for our parameter values but they tell us 
+nothing about the uncertainty of our estimate. We can get a sense for that by 
+looking at the highest density interval. 
 """
 nbCode:
   import algorithm
@@ -163,11 +256,6 @@ nbCode:
       hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
     result = (hdiMin, hdiMax)
 
-
-nbText: md"""
-#### The intervals
-"""
-nbCode:
   let 
     (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin..^1], 0.95)
     (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin..^1], 0.95)
@@ -178,7 +266,13 @@ nbCode:
 
 
 nbText: md"""
-## Histograms
+# Trace plots 
+We can get a sense for how well our mcmc performed and therefore gain some  
+sense for how good our estimates might be by looking at the trace plot which 
+shows the parameter value store during each step in the mcmc chain. Either 
+the accepted proposal or the previous one if the a proposal is rejected. Trace
+plots can be unreliable for confirming good mcmc performance so it is a good  
+idea to assess this with other methods as well. 
 """
 nbCode:
   let 
@@ -206,7 +300,8 @@ nbImage("images/samples-sd.png")
 
 
 nbText: md"""
-## Trace plots
+# Histograms 
+
 """
 nbCode:
   ggplot(df, aes("b0")) +
@@ -224,5 +319,13 @@ nbImage("images/hist-b0.png")
 nbImage("images/hist-b1.png")
 nbImage("images/hist-sd.png")
 
+
+# nbText: md"""
+# # Final Note 
+# Of course we could have simply and more efficiently done this using least squares regression.
+# However the Bayesian approach allows us to very easily and intuitively express
+# uncertainty about our estimates and can be easily extended to much more complex 
+# models for which there are not such simple solutions.
+# """
 
 nbSave
