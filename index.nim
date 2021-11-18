@@ -7,9 +7,9 @@ nbText: md"""
 # Bayesian Inference with Linear Model
 
 At the time of this writing, Nim does not have any libraries for
-conducting Bayesian inference. However, Nim makes it quite easy for us to
-write all of the necessary code ourselves. This is also a good exercise for
-learning about Bayesian inference and Nim's syntax and speed make it perfect
+conducting Bayesian inference. However, it is quite easy for us to
+write all of the necessary code ourselves. This is a good exercise for
+learning about Bayesian inference. Nim's syntax and speed make it perfect
 for this. We will assume that you have some basic understanding of Bayesian
 inference already. There are many excellent introductions available in books
 and online.
@@ -169,46 +169,51 @@ We will use a Metropolis-Hastings algorithm to approximate the posterior.
 3) Accept the proposed parameter value with probability ...
 """
 nbCode:
-  var 
-    nSamples = 200000
-    b0Samples = newSeq[float](nSamples+1) 
-    b1Samples = newSeq[float](nSamples+1) 
-    sdSamples = newSeq[float](nSamples+1) 
-
-  b0Samples[0] = 0.0  
-  b1Samples[0] = 1.0 
-  sdSamples[0] = 1.0 
+  proc mcmc(x, y: seq[float], nSamples: int, b0, b1, sd: float): (seq[float], 
+      seq[float], seq[float]) =  
+    var 
+      b0Samples = newSeq[float](nSamples+1) 
+      b1Samples = newSeq[float](nSamples+1) 
+      sdSamples = newSeq[float](nSamples+1) 
   
-  for i in 1..nSamples:
-    let 
-      prevB0 = b0Samples[i-1]
-      prevB1 = b1Samples[i-1]
-      prevSd = sdSamples[i-1]
-      propB0 = gauss(prevB0, 0.2) 
-      propB1 = gauss(prevB1, 0.2)
-      propSd = gauss(prevSd, 0.1)
-    if propSd > 0.0:
-      var
-        prevLogPost = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
-        propLogPost = logPosterior(x=x, y=y, b0=propB0, b1=propB1, sd=propSd) 
-        ratio = exp(propLogPost - prevLogPost)  
-      if rand(1.0) < ratio:
-        b0Samples[i] = propB0  
-        b1Samples[i] = propB1  
-        sdSamples[i] = propSd  
-      else: 
+    b0Samples[0] = b0  
+    b1Samples[0] = b1 
+    sdSamples[0] = sd 
+    
+    for i in 1..nSamples:
+      let 
+        prevB0 = b0Samples[i-1]
+        prevB1 = b1Samples[i-1]
+        prevSd = sdSamples[i-1]
+        propB0 = gauss(prevB0, 0.2) 
+        propB1 = gauss(prevB1, 0.2)
+        propSd = gauss(prevSd, 0.1)
+      if propSd > 0.0:
+        var
+          prevLogPost = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
+          propLogPost = logPosterior(x=x, y=y, b0=propB0, b1=propB1, sd=propSd) 
+          ratio = exp(propLogPost - prevLogPost)  
+        if rand(1.0) < ratio:
+          b0Samples[i] = propB0  
+          b1Samples[i] = propB1  
+          sdSamples[i] = propSd  
+        else: 
+          b0Samples[i] = prevB0  
+          b1Samples[i] = prevB1  
+          sdSamples[i] = prevSd  
+      else:
         b0Samples[i] = prevB0  
         b1Samples[i] = prevB1  
         sdSamples[i] = prevSd  
-    else:
-      b0Samples[i] = prevB0  
-      b1Samples[i] = prevB1  
-      sdSamples[i] = prevSd  
-
+    result = (b0Samples, b1Samples, sdSamples)
+  var
+    nSamples = 200000
+    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, 0, 1, 1) 
+  
 
 nbText: md"""
 # Burnin
-Initially the mcmc chain may spend a lot of time exploring unlikely regions 
+Initially the mcmc chain may spend time exploring unlikely regions 
 parameter space. We can get a better approximation of the posterior if we 
 exclude these early steps in the chain. These excluded samples are referred to   
 as the burnin. A burnin of $10%$ seems to work well with our informative priors 

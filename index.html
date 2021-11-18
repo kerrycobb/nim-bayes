@@ -42,9 +42,9 @@ section#source {
 </header><main>
 <h1>Bayesian Inference with Linear Model</h1>
 <p>At the time of this writing, Nim does not have any libraries for
-conducting Bayesian inference. However, Nim makes it quite easy for us to
-write all of the necessary code ourselves. This is also a good exercise for
-learning about Bayesian inference and Nim's syntax and speed make it perfect
+conducting Bayesian inference. However, it is quite easy for us to
+write all of the necessary code ourselves. This is a good exercise for
+learning about Bayesian inference. Nim's syntax and speed make it perfect
 for this. We will assume that you have some basic understanding of Bayesian
 inference already. There are many excellent introductions available in books
 and online.</p>
@@ -164,43 +164,49 @@ for each mcmc sample again using the $ln$.</p>
 <li>Propose a new parameter value close to the previous one.</li>
 <li>Accept the proposed parameter value with probability ...</li>
 </ol>
-<pre><code class="nim hljs"><span class="hljs-keyword">var</span>
-  nSamples = <span class="hljs-number">200000</span>
-  b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
-  b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
-  sdSamples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
-b0Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">0.0</span>
-b1Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</span>
-sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</span>
-<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1</span> .. nSamples:
-  <span class="hljs-keyword">let</span>
-    prevB0 = b0Samples[i - <span class="hljs-number">1</span>]
-    prevB1 = b1Samples[i - <span class="hljs-number">1</span>]
-    prevSd = sdSamples[i - <span class="hljs-number">1</span>]
-    propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>)
-    propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
-    propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
-  <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
-    <span class="hljs-keyword">var</span>
-      prevLogPost = logPosterior(x = x, y = y, b0 = prevB0, b1 = prevB1,
-                                 sd = prevSd)
-      propLogPost = logPosterior(x = x, y = y, b0 = propB0, b1 = propB1,
-                                 sd = propSd)
-      ratio = exp(propLogPost - prevLogPost)
-    <span class="hljs-keyword">if</span> rand(<span class="hljs-number">1.0</span>) &lt; ratio:
-      b0Samples[i] = propB0
-      b1Samples[i] = propB1
-      sdSamples[i] = propSd
+<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> mcmc(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; nSamples: <span class="hljs-built_in">int</span>; b0, b1, sd: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>],
+    <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]) =
+  <span class="hljs-keyword">var</span>
+    b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
+    b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
+    sdSamples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
+  b0Samples[<span class="hljs-number">0</span>] = b0
+  b1Samples[<span class="hljs-number">0</span>] = b1
+  sdSamples[<span class="hljs-number">0</span>] = sd
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1</span> .. nSamples:
+    <span class="hljs-keyword">let</span>
+      prevB0 = b0Samples[i - <span class="hljs-number">1</span>]
+      prevB1 = b1Samples[i - <span class="hljs-number">1</span>]
+      prevSd = sdSamples[i - <span class="hljs-number">1</span>]
+      propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>)
+      propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
+      propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
+    <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
+      <span class="hljs-keyword">var</span>
+        prevLogPost = logPosterior(x = x, y = y, b0 = prevB0, b1 = prevB1,
+                                   sd = prevSd)
+        propLogPost = logPosterior(x = x, y = y, b0 = propB0, b1 = propB1,
+                                   sd = propSd)
+        ratio = exp(propLogPost - prevLogPost)
+      <span class="hljs-keyword">if</span> rand(<span class="hljs-number">1.0</span>) &lt; ratio:
+        b0Samples[i] = propB0
+        b1Samples[i] = propB1
+        sdSamples[i] = propSd
+      <span class="hljs-keyword">else</span>:
+        b0Samples[i] = prevB0
+        b1Samples[i] = prevB1
+        sdSamples[i] = prevSd
     <span class="hljs-keyword">else</span>:
       b0Samples[i] = prevB0
       b1Samples[i] = prevB1
       sdSamples[i] = prevSd
-  <span class="hljs-keyword">else</span>:
-    b0Samples[i] = prevB0
-    b1Samples[i] = prevB1
-    sdSamples[i] = prevSd</code></pre>
+  <span class="hljs-literal">result</span> = (b0Samples, b1Samples, sdSamples)
+
+<span class="hljs-keyword">var</span>
+  nSamples = <span class="hljs-number">200000</span>
+  (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>)</code></pre>
 <h1>Burnin</h1>
-<p>Initially the mcmc chain may spend a lot of time exploring unlikely regions
+<p>Initially the mcmc chain may spend time exploring unlikely regions
 parameter space. We can get a better approximation of the posterior if we
 exclude these early steps in the chain. These excluded samples are referred to<br />
 as the burnin. A burnin of $10%$ seems to work well with our informative priors
@@ -219,9 +225,9 @@ the mean. Let's see how close these values are to the true means.</p>
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.3972981901305042
-1.003129738959811
-0.9975660889123292
+<pre><samp>-0.03878707038494573
+0.9987030586172279
+1.083846568231885
 </samp></pre>
 <h1>Highest density interval</h1>
 <p>The means give us a point estimate for our parameter values but they tell us
@@ -251,9 +257,9 @@ looking at the highest density interval.</p>
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.8241005228624089 0.006971099185924735
-0.9958153191058512 1.010317764363869
-0.8696065250887538 1.139423189156465
+<pre><samp>-0.5334491077913923 0.4337784943846376
+0.990751804182687 1.007030875750892
+0.9492099289898754 1.250897646314923
 </samp></pre>
 <h1>Trace plots</h1>
 <p>We can get a sense for how well our mcmc performed and therefore gain some<br />
@@ -337,9 +343,9 @@ nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Bayesian Inference with Linear Model
 
 At the time of this writing, Nim does not have any libraries for
-conducting Bayesian inference. However, Nim makes it quite easy for us to
-write all of the necessary code ourselves. This is also a good exercise for
-learning about Bayesian inference and Nim's syntax and speed make it perfect
+conducting Bayesian inference. However, it is quite easy for us to
+write all of the necessary code ourselves. This is a good exercise for
+learning about Bayesian inference. Nim's syntax and speed make it perfect
 for this. We will assume that you have some basic understanding of Bayesian
 inference already. There are many excellent introductions available in books
 and online.
@@ -499,46 +505,51 @@ We will use a Metropolis-Hastings algorithm to approximate the posterior.
 3) Accept the proposed parameter value with probability ...
 &quot;&quot;&quot;</span>
 nbCode:
-  <span class="hljs-keyword">var</span> 
-    nSamples = <span class="hljs-number">200000</span>
-    b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
-    b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
-    sdSamples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
-
-  b0Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">0.0</span>  
-  b1Samples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</span> 
-  sdSamples[<span class="hljs-number">0</span>] = <span class="hljs-number">1.0</span> 
+  <span class="hljs-keyword">proc</span> mcmc(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], nSamples: <span class="hljs-built_in">int</span>, b0, b1, sd: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], 
+      <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]) =  
+    <span class="hljs-keyword">var</span> 
+      b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
+      b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
+      sdSamples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
   
-  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1.</span>.nSamples:
-    <span class="hljs-keyword">let</span> 
-      prevB0 = b0Samples[i-<span class="hljs-number">1</span>]
-      prevB1 = b1Samples[i-<span class="hljs-number">1</span>]
-      prevSd = sdSamples[i-<span class="hljs-number">1</span>]
-      propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>) 
-      propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
-      propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
-    <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
-      <span class="hljs-keyword">var</span>
-        prevLogPost = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
-        propLogPost = logPosterior(x=x, y=y, b0=propB0, b1=propB1, sd=propSd) 
-        ratio = exp(propLogPost - prevLogPost)  
-      <span class="hljs-keyword">if</span> rand(<span class="hljs-number">1.0</span>) &lt; ratio:
-        b0Samples[i] = propB0  
-        b1Samples[i] = propB1  
-        sdSamples[i] = propSd  
-      <span class="hljs-keyword">else</span>: 
+    b0Samples[<span class="hljs-number">0</span>] = b0  
+    b1Samples[<span class="hljs-number">0</span>] = b1 
+    sdSamples[<span class="hljs-number">0</span>] = sd 
+    
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1.</span>.nSamples:
+      <span class="hljs-keyword">let</span> 
+        prevB0 = b0Samples[i-<span class="hljs-number">1</span>]
+        prevB1 = b1Samples[i-<span class="hljs-number">1</span>]
+        prevSd = sdSamples[i-<span class="hljs-number">1</span>]
+        propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>) 
+        propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
+        propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
+      <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
+        <span class="hljs-keyword">var</span>
+          prevLogPost = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
+          propLogPost = logPosterior(x=x, y=y, b0=propB0, b1=propB1, sd=propSd) 
+          ratio = exp(propLogPost - prevLogPost)  
+        <span class="hljs-keyword">if</span> rand(<span class="hljs-number">1.0</span>) &lt; ratio:
+          b0Samples[i] = propB0  
+          b1Samples[i] = propB1  
+          sdSamples[i] = propSd  
+        <span class="hljs-keyword">else</span>: 
+          b0Samples[i] = prevB0  
+          b1Samples[i] = prevB1  
+          sdSamples[i] = prevSd  
+      <span class="hljs-keyword">else</span>:
         b0Samples[i] = prevB0  
         b1Samples[i] = prevB1  
         sdSamples[i] = prevSd  
-    <span class="hljs-keyword">else</span>:
-      b0Samples[i] = prevB0  
-      b1Samples[i] = prevB1  
-      sdSamples[i] = prevSd  
-
+    <span class="hljs-literal">result</span> = (b0Samples, b1Samples, sdSamples)
+  <span class="hljs-keyword">var</span>
+    nSamples = <span class="hljs-number">200000</span>
+    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>) 
+  
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Burnin
-Initially the mcmc chain may spend a lot of time exploring unlikely regions 
+Initially the mcmc chain may spend time exploring unlikely regions 
 parameter space. We can get a better approximation of the posterior if we 
 exclude these early steps in the chain. These excluded samples are referred to   
 as the burnin. A burnin of $10%$ seems to work well with our informative priors 
