@@ -8,9 +8,9 @@ nbText: md"""
 
 At the time of this writing, Nim does not have any libraries for
 conducting Bayesian inference. However, it is quite easy for us to
-write all of the necessary code ourselves. This is a good exercise for
-learning about Bayesian inference. Nim's syntax and speed make it perfect
-for this. We will assume that you have some basic understanding of Bayesian
+write all of the necessary code ourselves. In this tutorial we will walk through 
+the different parts needed to perform Bayesian inference with a linear model. 
+We will assume that you have some basic understanding of Bayesian
 inference already. There are many excellent introductions available in books
 and online.
 
@@ -60,7 +60,7 @@ see below. -->
 
 
 # Generate Data
-We need some data to work with. Lets simulate data  
+We need some data to work with. Let's simulate data  
 under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, 1)$ with 
 $\beta_{0}=0$ $\beta_{1}=1$ and $\tau=1$
 """
@@ -93,13 +93,10 @@ nbImage("images/simulated-data.png")
 
 nbText: md"""
 # Prior
-Prior probabilities are central to Bayesian inference. We need to choose
-prior probability distributions for each of the parameters that we are
-estimating. We then need to be able to calculate the probability for a proposed
-parameter value under the chosen probability distribution. Let's use a normal
-distribution for the priors on $\beta_{0}$ and $\beta_{1}$ since these parameters
-can take any value. We will use a gamma distribution for the prior on $\tau$
-since it must have a value greater than 0.
+We need to choose prior probability distributions for each of the parameters 
+that we are estimating.  Let's use a normal distribution for the priors on 
+$\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter be a positive value greater 
+than 0 so let's use the gamma distribution.
 
 $$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$
 $$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$
@@ -112,19 +109,38 @@ $$ \beta_{0} \sim Normal(0, 1)$$
 $$ \beta_{1} \sim Normal(1, 1)$$
 $$ \tau \sim Gamma(1, 1)$$
 
-We will actually be using the $ln$ of the probabilities in thie tutorial to
-reduce rounding error since these values can be quite small.
+To calculate the prior probability of a proposed parameter value, we will need 
+the proability density functions for our priors.
 
-To calculate the prior probabilities for proposed parameter values we make use
-of the `distributions` package.
+#### Normal PDF
+$$ p(x) = \frac{1}{\sigma\sqrt{2\pi}} e^{-\frac{1}{2}(\frac{x-\mu}{\sigma})^{2}} $$
+
+#### Gamma PDF
+$$ p(x) = \frac{1}{\Gamma(k)\theta^{k}} x^{k-1} e^{-\frac{x}{\theta}} $$
+
+"""
+
+nbCode:
+  import std/math
+  proc normalPdf(z, mu, sigma: float): float = 
+    result = pow(E, (-0.5 * ((z - mu) / sigma))^2) / (sigma * sqrt(2.0 * PI))
+
+  proc gammaPdf(x, k, theta: float): float = 
+    result = pow(x, k - 1.0) * pow(E, -(x / theta)) / (gamma(k) * pow(theta, k))
+
+nbText: md"""
+
+Now that we have probability density functions available, we will be able to
+compute a prior probability for a given parameterization of the model.
+We will actually be using the $ln$ of the probabilities to
+reduce rounding error since these values can be quite small.
 """
 nbCode:
-  import distributions, std/math
   proc logPrior(b0, b1, sd: float): float = 
     let 
-      b0Prior = ln(initNormalDistribution(0.0, 1.0).pdf(b0))
-      b1Prior = ln(initNormalDistribution(1.0, 1.0).pdf(b1))
-      sdPrior = ln(initGammaDistribution(1.0, 1.0).pdf(1/sd))
+      b0Prior = ln(normalPdf(b0, 0.0, 1.0))
+      b1Prior = ln(normalPdf(b1, 1.0, 1.0))
+      sdPrior = ln(gammaPdf(1/sd, 1.0, 1.0))
     result = b0Prior + b1Prior + sdPrior
 
 
@@ -134,23 +150,30 @@ We need to be able to calculate the likelihood of the observed $y_{i}$ values
 given the observed $x_{i}$ values and proposed parameter values for $\beta_{0}$, 
 $\beta_{1}$, and $\tau$. 
 
+We can write the linear model a different way:   
+
 $$\mu = \beta_{0} +\beta_{1} x$$
-$$ y \sim N(\mu, \tau)$$
+$$ y \sim N(\mu, \tau) $$
+
+To compute the likelihood for a given set of $\beta_{0}$, $\beta_{1}$, $\tau$ 
+parameters we use the normal probability density function  
+
 
 """
 nbCode:
   proc logLikelihood(x, y: seq[float], b0, b1, sd: float): float = 
     var likelihoods = newSeq[float](y.len) 
-    for i in 0..<y.len: 
+    for i in 0 ..< y.len: 
       let pred = b0 + b1 * x[i]
-      likelihoods[i] = ln(initNormalDistribution(pred, sd).pdf(y[i]))
+      likelihoods[i] = ln(normalPdf(y[i], pred, sd))
     result = sum(likelihoods) 
 
 
 nbText: md"""
 # Posterior
-We cannot analytically solve the posterior probability distribution but we can
-approximate it with mcmc. To do this we will compute the posterior probability
+With 
+ We cannot analytically solve the posterior probability distribution but we can
+approximate it with mcmc. To do this we will compute the posterior probability -->
 for each mcmc sample again using the $ln$. 
 """
 nbCode:
@@ -279,58 +302,58 @@ the accepted proposal or the previous one if the a proposal is rejected. Trace
 plots can be unreliable for confirming good mcmc performance so it is a good  
 idea to assess this with other methods as well. 
 """
-nbCode:
-  let 
-    ixs = toSeq(0 ..< b0Samples.len-burnin)
-    df = seqsToDf({
-      "ixs":ixs, 
-      "b0":b0Samples[burnin..^1],
-      "b1":b1Samples[burnin..^1],
-      "sd":sdSamples[burnin..^1]})
+# nbCode:
+#   let 
+#     ixs = toSeq(0 ..< b0Samples.len-burnin)
+#     df = seqsToDf({
+#       "ixs":ixs, 
+#       "b0":b0Samples[burnin..^1],
+#       "b1":b1Samples[burnin..^1],
+#       "sd":sdSamples[burnin..^1]})
 
-  ggplot(df, aes(x="ixs", y="b0")) + 
-    geom_line() +
-    ggsave("images/samples-b0.png")
+#   ggplot(df, aes(x="ixs", y="b0")) + 
+#     geom_line() +
+#     ggsave("images/samples-b0.png")
   
-  ggplot(df, aes(x="ixs", y="b1")) + 
-    geom_line() +
-    ggsave("images/samples-b1.png")
+#   ggplot(df, aes(x="ixs", y="b1")) + 
+#     geom_line() +
+#     ggsave("images/samples-b1.png")
   
-  ggplot(df, aes(x="ixs", y="sd")) + 
-    geom_line() +
-    ggsave("images/samples-sd.png")
-nbImage("images/samples-b0.png")
-nbImage("images/samples-b1.png")
-nbImage("images/samples-sd.png")
+#   ggplot(df, aes(x="ixs", y="sd")) + 
+#     geom_line() +
+#     ggsave("images/samples-sd.png")
+# nbImage("images/samples-b0.png")
+# nbImage("images/samples-b1.png")
+# nbImage("images/samples-sd.png")
 
 
 nbText: md"""
 # Histograms 
 
 """
-nbCode:
-  ggplot(df, aes("b0")) +
-    geom_histogram() +
-    ggsave("images/hist-b0.png")
+# nbCode:
+#   ggplot(df, aes("b0")) +
+#     geom_histogram() +
+#     ggsave("images/hist-b0.png")
   
-  ggplot(df, aes("b1")) +
-    geom_histogram() +
-    ggsave("images/hist-b1.png")
+#   ggplot(df, aes("b1")) +
+#     geom_histogram() +
+#     ggsave("images/hist-b1.png")
   
-  ggplot(df, aes("sd")) +
-    geom_histogram() +
-    ggsave("images/hist-sd.png")
-nbImage("images/hist-b0.png")
-nbImage("images/hist-b1.png")
-nbImage("images/hist-sd.png")
+#   ggplot(df, aes("sd")) +
+#     geom_histogram() +
+#     ggsave("images/hist-sd.png")
+# nbImage("images/hist-b0.png")
+# nbImage("images/hist-b1.png")
+# nbImage("images/hist-sd.png")
 
 
-# nbText: md"""
-# # Final Note 
-# Of course we could have simply and more efficiently done this using least squares regression.
-# However the Bayesian approach allows us to very easily and intuitively express
-# uncertainty about our estimates and can be easily extended to much more complex 
-# models for which there are not such simple solutions.
-# """
+nbText: md"""
+# Final Note 
+Of course we could have simply and more efficiently done this using least squares regression.
+However the Bayesian approach allows us to very easily and intuitively express
+uncertainty about our estimates and can be easily extended to much more complex 
+models for which there are not such simple solutions.
+"""
 
 nbSave
