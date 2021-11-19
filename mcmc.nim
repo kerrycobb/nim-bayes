@@ -4,8 +4,8 @@ import std/random
 import std/stats
 import std/sequtils
 import std/algorithm
-import datamancer
-import ggplotnim
+# import datamancer
+# import ggplotnim
 import std/strformat
 
 proc hdi(samples: seq[float], credMass: float): (float, float) =  
@@ -58,9 +58,9 @@ proc mcmc(x, y: seq[float], nSamples: int, b0Start, b1Start, sdStart: float):
       prevB0 = b0Samples[i-1]
       prevB1 = b1Samples[i-1]
       prevSd = sdSamples[i-1]
-      propB0 = gauss(prevB0, 0.3) 
-      propB1 = gauss(prevB1, 0.1)
-      propSd = gauss(prevSd, 1.0)
+      propB0 = gauss(prevB0, 0.5) 
+      propB1 = gauss(prevB1, 0.5)
+      propSd = gauss(prevSd, 0.5)
     if propSd > 0.0:
       var
         prevLogPosterior = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
@@ -84,13 +84,13 @@ randomize()
 
 ### Generate data
 var
-  N = 100
+  n = 100
   b0 = 0.0
   b1 = 1.0
-  sd = 100.0
-  x = newSeq[float](N)
-  y = newSeq[float](N)
-for i in 0..< N: 
+  sd = 1.0
+  x = newSeq[float](n)
+  y = newSeq[float](n)
+for i in 0..<n: 
   x[i] = rand(10.0..100.0)#.float 
   y[i] = b0 + b1 * x[i] + gauss(0.0, sd) 
 
@@ -98,17 +98,18 @@ for i in 0..< N:
 var 
   meanX = mean(x) 
   sdX = standardDeviation(x)
-  meanY = mean(y) 
-  sdY = standardDeviation(y)
-for i in 0 ..< N:
+  # meanY = mean(y) 
+  # sdY = standardDeviation(y)
+for i in 0 ..< n:
   x[i] = (x[i] - meanX) / sdX 
+#   echo x[i]
   # y[i] = (y[i] - meanY) / sdY
 
 
-var sim = seqsToDf(x, y)
-ggplot(sim, aes("x", "y")) +
-  geom_point() +
-  ggsave("plots/simulated-data.png")
+# var sim = seqsToDf(x, y)
+# ggplot(sim, aes("x", "y")) +
+#   geom_point() +
+#   ggsave("plots/simulated-data.png")
 
 ### Run Analysis
 var 
@@ -140,46 +141,46 @@ echo "sd: ", meansd
 echo sdHdiMin, " ", sdHdiMax
 
 # Plots
-let df = seqsToDf({
-    "ixs":ixs, 
-    "b0":b0Samples[burnin..^1],
-    "b1":b1Samples[burnin..^1],
-    "sd":sdSamples[burnin..^1]})
+# let df = seqsToDf({
+#     "ixs":ixs, 
+#     "b0":b0Samples[burnin..^1],
+#     "b1":b1Samples[burnin..^1],
+#     "sd":sdSamples[burnin..^1]})
 
-ggplot(df, aes(x="ixs", y="b0")) + 
-  geom_line() +
-  ggsave("plots/samples-b0.png")
+# ggplot(df, aes(x="ixs", y="b0")) + 
+#   geom_line() +
+#   ggsave("plots/samples-b0.png")
 
-ggplot(df, aes(x="ixs", y="b1")) + 
-  geom_line() +
-  ggsave("plots/samples-b1.png")
+# ggplot(df, aes(x="ixs", y="b1")) + 
+#   geom_line() +
+#   ggsave("plots/samples-b1.png")
 
-ggplot(df, aes(x="ixs", y="sd")) + 
-  geom_line() +
-  ggsave("plots/samples-sd.png")
-
-
-ggplot(df, aes("b0")) +
-  geom_histogram() +
-  ggsave("plots/hist-b0.png")
-
-ggplot(df, aes("b1")) +
-  geom_histogram() +
-  ggsave("plots/hist-b1.png")
-
-ggplot(df, aes("sd")) +
-  geom_histogram() +
-  ggsave("plots/hist-sd.png")
+# ggplot(df, aes(x="ixs", y="sd")) + 
+#   geom_line() +
+#   ggsave("plots/samples-sd.png")
 
 
-# Save simulated data & mcmc sample
-let data = open("data.csv", fmWrite)
-data.writeLine("x,y")
-for i in 0..<x.len: 
-  data.writeLine(&"{x[i]},{y[i]}")
+# ggplot(df, aes("b0")) +
+#   geom_histogram() +
+#   ggsave("plots/hist-b0.png")
 
-let output = open("samples.csv", fmWrite) 
-output.writeLine("b0,b1,sd")
-for i in 0 .. nSamples:
-  output.writeLine(&"{b0Samples[i]},{b1Samples[i]},{sdSamples[i]}")
+# ggplot(df, aes("b1")) +
+#   geom_histogram() +
+#   ggsave("plots/hist-b1.png")
+
+# ggplot(df, aes("sd")) +
+#   geom_histogram() +
+#   ggsave("plots/hist-sd.png")
+
+
+# # Save simulated data & mcmc sample
+# let data = open("data.csv", fmWrite)
+# data.writeLine("x,y")
+# for i in 0..<x.len: 
+#   data.writeLine(&"{x[i]},{y[i]}")
+
+# let output = open("samples.csv", fmWrite) 
+# output.writeLine("b0,b1,sd")
+# for i in 0 .. nSamples:
+#   output.writeLine(&"{b0Samples[i]},{b1Samples[i]},{sdSamples[i]}")
 

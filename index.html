@@ -43,7 +43,9 @@ section#source {
 <h1>Bayesian Inference with Linear Model</h1>
 <p>At the time of this writing, Nim does not have any libraries for
 conducting Bayesian inference. However, it is quite easy for us to
-write all of the necessary code ourselves. In this tutorial we will walk through
+write all of the necessary code ourselves. This is a good exercise for learning
+about Bayesian inference and the syntax and speed of Nim make it an excellent
+choice for the this. In this tutorial we will walk through
 the different parts needed to perform Bayesian inference with a linear model.
 We will assume that you have some basic understanding of Bayesian
 inference already. There are many excellent introductions available in books
@@ -65,24 +67,15 @@ error which we will call $\tau$.</p>
 <p>$$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) =
 \frac{P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)}
 {\iiint d\beta_{0} d\beta_{1} d\tau P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)} $$</p>
-<!-- For our model we will assume: 
-$$ y \sim N(\mu, \tau)$$
-$$\mu = \beta_{0} +\beta_{1} x$$
-$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$ 
-$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$ 
-$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$  -->
-<!-- For the marginal we need to sum over the probabilities of the data for all -->
-<!-- possible values under our priors.   -->
-<!-- We don't want to have to solve this analytically so we can approximate the posterior
-distribution with markov chain monte carlo (MCMC) simulation since as you will 
-see below. -->
-<!-- $$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $$ -->
 <h1>Generate Data</h1>
 <p>We need some data to work with. Let's simulate data<br />
 under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, 1)$ with
 $\beta_{0}=0$ $\beta_{1}=1$ and $\tau=1$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
   std / sequtils, std / random
+
+<span class="hljs-keyword">import</span>
+  stats
 
 <span class="hljs-keyword">var</span>
   n = <span class="hljs-number">100</span>
@@ -107,7 +100,7 @@ ggplot(sim, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hlj
 <figcaption></figcaption>
 </figure>
 
-<h1>Prior</h1>
+<h1>Priors</h1>
 <p>We need to choose prior probability distributions for each of the parameters
 that we are estimating.  Let's use a normal distribution for the priors on
 $\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter be a positive value greater
@@ -127,10 +120,13 @@ the proability density functions for our priors.</p>
 <h4>Gamma PDF</h4>
 <p>$$ p(x) = \frac{1}{\Gamma(k)\theta^{k}} x^{k-1} e^{-\frac{x}{\theta}} $$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  distributions
+
+<span class="hljs-keyword">import</span>
   std / math
 
 <span class="hljs-keyword">proc</span> normalPdf(z, mu, sigma: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
-  <span class="hljs-literal">result</span> = pow(<span class="hljs-type">E</span>, (-<span class="hljs-number">0.5</span> * ((z - mu) / sigma)) ^ <span class="hljs-number">2</span>) / (sigma * sqrt(<span class="hljs-number">2.0</span> * <span class="hljs-type">PI</span>))
+  <span class="hljs-literal">result</span> = pow(<span class="hljs-type">E</span>, (-<span class="hljs-number">0.5</span> * ((z - mu) / sigma) ^ <span class="hljs-number">2</span>)) / (sigma * sqrt(<span class="hljs-number">2.0</span> * <span class="hljs-type">PI</span>))
 
 <span class="hljs-keyword">proc</span> gammaPdf(x, k, theta: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
   <span class="hljs-literal">result</span> = pow(x, k - <span class="hljs-number">1.0</span>) * pow(<span class="hljs-type">E</span>, -(x / theta)) / (gamma(k) * pow(theta, k))</code></pre>
@@ -148,11 +144,13 @@ reduce rounding error since these values can be quite small.</p>
 <p>We need to be able to calculate the likelihood of the observed $y_{i}$ values
 given the observed $x_{i}$ values and proposed parameter values for $\beta_{0}$,
 $\beta_{1}$, and $\tau$.</p>
-<p>We can write the linear model a different way:</p>
+<p>We can write the model in a slightly different way:</p>
 <p>$$\mu = \beta_{0} +\beta_{1} x$$
 $$ y \sim N(\mu, \tau) $$</p>
-<p>To compute the likelihood for a given set of $\beta_{0}$, $\beta_{1}$, $\tau$
-parameters we use the normal probability density function</p>
+<p>Then to compute the likelihood for a given set of $\beta_{0}$, $\beta_{1}$, $\tau$
+parameters and data values $x_{i}$ and $y_{i}$ we use the normal probability
+density function which we wrote before. We will again work with the $ln$ of the<br />
+likelihood as we did with the priors.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">proc</span> logLikelihood(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
   <span class="hljs-keyword">var</span> likelihoods = newSeq[<span class="hljs-built_in">float</span>](y.len)
   <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; y.len:
@@ -160,24 +158,27 @@ parameters we use the normal probability density function</p>
     likelihoods[i] = ln(normalPdf(y[i], pred, sd))
   <span class="hljs-literal">result</span> = sum(likelihoods)</code></pre>
 <h1>Posterior</h1>
-<p>With
-We cannot analytically solve the posterior probability distribution but we can
-approximate it with mcmc. To do this we will compute the posterior probability --&gt;
-for each mcmc sample again using the $ln$.</p>
+<p>We cannot analytically solve the posterior probability distribution of our
+linear model as the integration of the marginal likelihood is intractable.
+But we can approximate it with markov chain monte carlo (mcmc) thanks to this
+property of Bayes rule:</p>
+<p>$$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) \propto
+P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau) $$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">proc</span> logPosterior(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
   <span class="hljs-keyword">let</span>
     like = logLikelihood(x = x, y = y, b0 = b0, b1 = b1, sd = sd)
     prior = logPrior(b0 = b0, b1 = b1, sd = sd)
   <span class="hljs-literal">result</span> = like + prior</code></pre>
 <h1>MCMC</h1>
-<p>We will use a Metropolis-Hastings algorithm to approximate the posterior.</p>
+<p>We will use a Metropolis-Hastings algorithm to approximate the posterior.
+The steps of this algorithm are as follows:</p>
 <ol>
 <li>Choose starting values</li>
-<li>Propose a new parameter value close to the previous one.</li>
+<li>Propose new parameter values close to the previous ones.</li>
 <li>Accept the proposed parameter value with probability ...</li>
 </ol>
-<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> mcmc(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; nSamples: <span class="hljs-built_in">int</span>; b0, b1, sd: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>],
-    <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]) =
+<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> mcmc(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; nSamples: <span class="hljs-built_in">int</span>; b0, b1, sd, pb0, pb1, psd: <span class="hljs-built_in">float</span>): (
+    <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]) =
   <span class="hljs-keyword">var</span>
     b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
     b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples + <span class="hljs-number">1</span>)
@@ -190,9 +191,9 @@ for each mcmc sample again using the $ln$.</p>
       prevB0 = b0Samples[i - <span class="hljs-number">1</span>]
       prevB1 = b1Samples[i - <span class="hljs-number">1</span>]
       prevSd = sdSamples[i - <span class="hljs-number">1</span>]
-      propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>)
-      propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
-      propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
+      propB0 = gauss(prevB0, pb0)
+      propB1 = gauss(prevB1, pb1)
+      propSd = gauss(prevSd, psd)
     <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
       <span class="hljs-keyword">var</span>
         prevLogPost = logPosterior(x = x, y = y, b0 = prevB0, b1 = prevB1,
@@ -215,10 +216,11 @@ for each mcmc sample again using the $ln$.</p>
   <span class="hljs-literal">result</span> = (b0Samples, b1Samples, sdSamples)
 
 <span class="hljs-keyword">var</span>
-  nSamples = <span class="hljs-number">200000</span>
-  (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>)</code></pre>
+  nSamples = <span class="hljs-number">100000</span>
+  (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>,
+      <span class="hljs-number">0.1</span>)</code></pre>
 <h1>Burnin</h1>
-<p>Initially the mcmc chain may spend time exploring unlikely regions
+<p>Initially the mcmc chain may spend time exploring unlikely regions of
 parameter space. We can get a better approximation of the posterior if we
 exclude these early steps in the chain. These excluded samples are referred to<br />
 as the burnin. A burnin of $10%$ seems to work well with our informative priors
@@ -226,7 +228,7 @@ and starting values.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">let</span> burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span></code></pre>
 <h1>Posterior means</h1>
 <p>One way to summarize the estimates from the posterior distribution is to calculate
-the mean. Let's see how close these values are to the true means.</p>
+the mean. Let's see how close these values are to the true values of the parameters.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
   stats
 
@@ -237,9 +239,9 @@ the mean. Let's see how close these values are to the true means.</p>
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.1262732553212211
-0.4609250643837378
-0.7275331691986515
+<pre><samp>-0.002775107229619194
+1.000429152353974
+1.125313329690522
 </samp></pre>
 <h1>Highest density interval</h1>
 <p>The means give us a point estimate for our parameter values but they tell us
@@ -269,18 +271,181 @@ looking at the highest density interval.</p>
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.1262732553212211 -0.1262732553212211
-0.4609250643837378 0.4609250643837378
-0.7275331691986515 0.7275331691986515
+<pre><samp>-0.5326155208898431 0.4460144939107637
+0.992316502107233 1.00891980911337
+0.9663992112292861 1.286030093739193
 </samp></pre>
 <h1>Trace plots</h1>
 <p>We can get a sense for how well our mcmc performed and therefore gain some<br />
 sense for how good our estimates might be by looking at the trace plot which
 shows the parameter value store during each step in the mcmc chain. Either
 the accepted proposal or the previous one if the a proposal is rejected. Trace
-plots can be unreliable for confirming good mcmc performance so it is a good<br />
+plots can be unreliable for mcmc performance so it is a good<br />
 idea to assess this with other methods as well.</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
+  ixs = toSeq(<span class="hljs-number">0</span> ..&lt; b0Samples.len - burnin)
+  df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: ixs, <span class="hljs-string">&quot;b0&quot;</span>: b0Samples[burnin ..^ <span class="hljs-number">1</span>],
+                 <span class="hljs-string">&quot;b1&quot;</span>: b1Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-string">&quot;sd&quot;</span>: sdSamples[burnin ..^ <span class="hljs-number">1</span>]})
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b1&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;sd&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)</code></pre>
+<pre><samp>INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./images/samples-b0.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/samples-b1.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/samples-sd.png" alt="">
+<figcaption></figcaption>
+</figure>
+
 <h1>Histograms</h1>
+<pre><code class="nim hljs">ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
+ggplot(df, aes(<span class="hljs-string">&quot;b1&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
+ggplot(df, aes(<span class="hljs-string">&quot;sd&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)</code></pre>
+<pre><samp>StatusSuccess output of write_to_png
+StatusSuccess output of write_to_png
+StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./images/hist-b0.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/hist-b1.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/hist-sd.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<h1>Standardize Data</h1>
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span>
+  stX = newSeq[<span class="hljs-built_in">float</span>](n)
+  stY = newSeq[<span class="hljs-built_in">float</span>](n)
+  meanX = mean(x)
+  sdX = standardDeviation(x)
+  meanY = mean(y)
+  sdY = standardDeviation(y)
+<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n:
+  stX[i] = (x[i] - meanX) / sdX
+  stY[i] = (y[i] - meanY) / sdY</code></pre>
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span> standardized = seqsToDf(stX, stY)
+ggplot(standardized, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) + geom_point() +
+    ggsave(<span class="hljs-string">&quot;images/st-simulated-data.png&quot;</span>)</code></pre>
+<pre><samp>StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./images/st-simulated-data.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span> (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>,
+    <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)</code></pre>
+<h3>Convert back to original scale</h3>
+<p>$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$<br />
+$$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$
+Is this right?
+$$ \beta_{0} = \zeta_{SD} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:
+  b0StSamples[i] = b0StSamples[i] * sdY + meanY -
+      b1StSamples[i] * sdY * meanX / sdX
+  b1StSamples[i] = b1StSamples[i] * sdY / sdX
+  sdStSamples[i] = sdStSamples[i] * sdY + meanY -
+      b1StSamples[i] * sdY * meanX / sdX</code></pre>
+<h3>Means and HDIs</h3>
+<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
+  meanStB0 = mean(b0StSamples[burnin ..^ <span class="hljs-number">1</span>])
+  meanStB1 = mean(b1StSamples[burnin ..^ <span class="hljs-number">1</span>])
+  meanStSd = mean(sdStSamples[burnin ..^ <span class="hljs-number">1</span>])
+<span class="hljs-keyword">echo</span> meanStB0
+<span class="hljs-keyword">echo</span> meanStB1
+<span class="hljs-keyword">echo</span> meanStSd
+<span class="hljs-keyword">let</span>
+  (b0StHdiMin, b0StHdiMax) = hdi(b0StSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+  (b1StHdiMin, b1StHdiMax) = hdi(b1StSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+  (sdStHdiMin, sdStHdiMax) = hdi(sdStSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+<span class="hljs-keyword">echo</span> b0StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b0StHdiMax
+<span class="hljs-keyword">echo</span> b1StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b1StHdiMax
+<span class="hljs-keyword">echo</span> sdStHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdStHdiMax
+<span class="hljs-keyword">let</span> stDf = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: ixs, <span class="hljs-string">&quot;b0&quot;</span>: b0StSamples[burnin ..^ <span class="hljs-number">1</span>],
+                     <span class="hljs-string">&quot;b1&quot;</span>: b1StSamples[burnin ..^ <span class="hljs-number">1</span>],
+                     <span class="hljs-string">&quot;sd&quot;</span>: sdStSamples[burnin ..^ <span class="hljs-number">1</span>]})</code></pre>
+<pre><samp>0.02178682696477597
+1.000047917231239
+1.235752301390908
+-0.5228674329792611 0.5614092702740123
+0.9910823827888459 1.009720278197477
+0.6955795718746316 1.733878746537485
+</samp></pre>
+<h3>Plots</h3>
+<pre><code class="nim hljs">ggplot(stDf, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/st-samples-b0.png&quot;</span>)
+ggplot(stDf, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b1&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/st-samples-b1.png&quot;</span>)
+ggplot(stDf, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;sd&quot;</span>)) + geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)
+ggplot(stDf, aes(<span class="hljs-string">&quot;b0&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
+ggplot(stDf, aes(<span class="hljs-string">&quot;b1&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
+ggplot(stDf, aes(<span class="hljs-string">&quot;sd&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)</code></pre>
+<pre><samp>INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+StatusSuccess output of write_to_png
+StatusSuccess output of write_to_png
+StatusSuccess output of write_to_png
+StatusSuccess output of write_to_png
+</samp></pre>
+<figure>
+<img src="./images/st-samples-b0.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/st-samples-b1.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/st-samples-sd.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/st-hist-b0.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/st-hist-b1.png" alt="">
+<figcaption></figcaption>
+</figure>
+
+<figure>
+<img src="./images/st-hist-sd.png" alt="">
+<figcaption></figcaption>
+</figure>
+
 <h1>Final Note</h1>
 <p>Of course we could have simply and more efficiently done this using least squares regression.
 However the Bayesian approach allows us to very easily and intuitively express
@@ -307,7 +472,9 @@ nbText: <span class="hljs-string">md&quot;&quot;&quot;
 
 At the time of this writing, Nim does not have any libraries for
 conducting Bayesian inference. However, it is quite easy for us to
-write all of the necessary code ourselves. In this tutorial we will walk through 
+write all of the necessary code ourselves. This is a good exercise for learning
+about Bayesian inference and the syntax and speed of Nim make it an excellent 
+choice for the this. In this tutorial we will walk through 
 the different parts needed to perform Bayesian inference with a linear model. 
 We will assume that you have some basic understanding of Bayesian
 inference already. There are many excellent introductions available in books
@@ -339,25 +506,6 @@ $$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) =
   {\iiint d\beta_{0} d\beta_{1} d\tau P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)} $$
 
 
-
-&lt;!-- For our model we will assume: 
-$$ y \sim N(\mu, \tau)$$
-$$\mu = \beta_{0} +\beta_{1} x$$
-$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$ 
-$$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$ 
-$$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$  --&gt;
-
-
-&lt;!-- For the marginal we need to sum over the probabilities of the data for all --&gt;
-&lt;!-- possible values under our priors.   --&gt;
-
-&lt;!-- We don't want to have to solve this analytically so we can approximate the posterior
-distribution with markov chain monte carlo (MCMC) simulation since as you will 
-see below. --&gt;
-
-&lt;!-- $$ p(\beta_{0}, \beta_{1}, \tau | y) \propto p(y|\beta_{0}, \beta_{1}, \tau) p(\beta_{0}, \beta_{1}, \tau) $$ --&gt;
-
-
 # Generate Data
 We need some data to work with. Let's simulate data  
 under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, 1)$ with 
@@ -365,7 +513,7 @@ $\beta_{0}=0$ $\beta_{1}=1$ and $\tau=1$
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">import</span> std/sequtils, std/random 
-  <span class="hljs-comment"># randomize()</span>
+  <span class="hljs-keyword">import</span> stats
   <span class="hljs-keyword">var</span> 
     n = <span class="hljs-number">100</span>
     b0 = <span class="hljs-number">0.0</span>
@@ -376,8 +524,6 @@ nbCode:
   <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n: 
     x[i] = rand(<span class="hljs-number">10.0</span>..<span class="hljs-number">100.0</span>) 
     y[i] = b0 + b1 * x[i] + gauss(<span class="hljs-number">0.0</span>, sd) 
-
-
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 We can use `ggplotnim` to see what these data look like.
 &quot;&quot;&quot;</span>
@@ -391,7 +537,7 @@ nbImage(<span class="hljs-string">&quot;images/simulated-data.png&quot;</span>)
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-# Prior
+# Priors
 We need to choose prior probability distributions for each of the parameters 
 that we are estimating.  Let's use a normal distribution for the priors on 
 $\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter be a positive value greater 
@@ -420,9 +566,11 @@ $$ p(x) = \frac{1}{\Gamma(k)\theta^{k}} x^{k-1} e^{-\frac{x}{\theta}} $$
 &quot;&quot;&quot;</span>
 
 nbCode:
+  <span class="hljs-keyword">import</span> distributions  
   <span class="hljs-keyword">import</span> std/math
+
   <span class="hljs-keyword">proc</span> normalPdf(z, mu, sigma: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
-    <span class="hljs-literal">result</span> = pow(<span class="hljs-type">E</span>, (-<span class="hljs-number">0.5</span> * ((z - mu) / sigma))^<span class="hljs-number">2</span>) / (sigma * sqrt(<span class="hljs-number">2.0</span> * <span class="hljs-type">PI</span>))
+    <span class="hljs-literal">result</span> = pow(<span class="hljs-type">E</span>, (-<span class="hljs-number">0.5</span> * ((z - mu) / sigma)^<span class="hljs-number">2</span>)) / (sigma * sqrt(<span class="hljs-number">2.0</span> * <span class="hljs-type">PI</span>))
 
   <span class="hljs-keyword">proc</span> gammaPdf(x, k, theta: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
     <span class="hljs-literal">result</span> = pow(x, k - <span class="hljs-number">1.0</span>) * pow(<span class="hljs-type">E</span>, -(x / theta)) / (gamma(k) * pow(theta, k))
@@ -449,14 +597,15 @@ We need to be able to calculate the likelihood of the observed $y_{i}$ values
 given the observed $x_{i}$ values and proposed parameter values for $\beta_{0}$, 
 $\beta_{1}$, and $\tau$. 
 
-We can write the linear model a different way:   
+We can write the model in a slightly different way:   
 
 $$\mu = \beta_{0} +\beta_{1} x$$
 $$ y \sim N(\mu, \tau) $$
 
-To compute the likelihood for a given set of $\beta_{0}$, $\beta_{1}$, $\tau$ 
-parameters we use the normal probability density function  
-
+Then to compute the likelihood for a given set of $\beta_{0}$, $\beta_{1}$, $\tau$ 
+parameters and data values $x_{i}$ and $y_{i}$ we use the normal probability 
+density function which we wrote before. We will again work with the $ln$ of the  
+likelihood as we did with the priors.
 
 &quot;&quot;&quot;</span>
 nbCode:
@@ -470,10 +619,14 @@ nbCode:
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Posterior
-With 
- We cannot analytically solve the posterior probability distribution but we can
-approximate it with mcmc. To do this we will compute the posterior probability --&gt;
-for each mcmc sample again using the $ln$. 
+We cannot analytically solve the posterior probability distribution of our
+linear model as the integration of the marginal likelihood is intractable. 
+But we can approximate it with markov chain monte carlo (mcmc) thanks to this 
+property of Bayes rule:
+
+$$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) \propto
+  P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau) $$
+
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">proc</span> logPosterior(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], b0, b1, sd: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
@@ -486,13 +639,14 @@ nbCode:
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # MCMC
 We will use a Metropolis-Hastings algorithm to approximate the posterior. 
+The steps of this algorithm are as follows:
 1) Choose starting values
-2) Propose a new parameter value close to the previous one.
+2) Propose new parameter values close to the previous ones.
 3) Accept the proposed parameter value with probability ...
 &quot;&quot;&quot;</span>
 nbCode:
-  <span class="hljs-keyword">proc</span> mcmc(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], nSamples: <span class="hljs-built_in">int</span>, b0, b1, sd: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], 
-      <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]) =  
+  <span class="hljs-keyword">proc</span> mcmc(x, y: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], nSamples: <span class="hljs-built_in">int</span>, b0, b1, sd, pb0, pb1, psd: <span class="hljs-built_in">float</span>): 
+      (<span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]) =  
     <span class="hljs-keyword">var</span> 
       b0Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
       b1Samples = newSeq[<span class="hljs-built_in">float</span>](nSamples+<span class="hljs-number">1</span>) 
@@ -507,9 +661,9 @@ nbCode:
         prevB0 = b0Samples[i-<span class="hljs-number">1</span>]
         prevB1 = b1Samples[i-<span class="hljs-number">1</span>]
         prevSd = sdSamples[i-<span class="hljs-number">1</span>]
-        propB0 = gauss(prevB0, <span class="hljs-number">0.2</span>) 
-        propB1 = gauss(prevB1, <span class="hljs-number">0.2</span>)
-        propSd = gauss(prevSd, <span class="hljs-number">0.1</span>)
+        propB0 = gauss(prevB0, pb0) 
+        propB1 = gauss(prevB1, pb1)
+        propSd = gauss(prevSd, psd)
       <span class="hljs-keyword">if</span> propSd &gt; <span class="hljs-number">0.0</span>:
         <span class="hljs-keyword">var</span>
           prevLogPost = logPosterior(x=x, y=y, b0=prevB0, b1=prevB1, sd=prevSd) 
@@ -529,13 +683,13 @@ nbCode:
         sdSamples[i] = prevSd  
     <span class="hljs-literal">result</span> = (b0Samples, b1Samples, sdSamples)
   <span class="hljs-keyword">var</span>
-    nSamples = <span class="hljs-number">200000</span>
-    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>) 
+    nSamples = <span class="hljs-number">100000</span>
+    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>) 
   
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Burnin
-Initially the mcmc chain may spend time exploring unlikely regions 
+Initially the mcmc chain may spend time exploring unlikely regions of 
 parameter space. We can get a better approximation of the posterior if we 
 exclude these early steps in the chain. These excluded samples are referred to   
 as the burnin. A burnin of $10%$ seems to work well with our informative priors 
@@ -548,7 +702,7 @@ nbCode:
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Posterior means
 One way to summarize the estimates from the posterior distribution is to calculate
-the mean. Let's see how close these values are to the true means. 
+the mean. Let's see how close these values are to the true values of the parameters. 
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">import</span> stats
@@ -598,53 +752,157 @@ We can get a sense for how well our mcmc performed and therefore gain some
 sense for how good our estimates might be by looking at the trace plot which 
 shows the parameter value store during each step in the mcmc chain. Either 
 the accepted proposal or the previous one if the a proposal is rejected. Trace
-plots can be unreliable for confirming good mcmc performance so it is a good  
+plots can be unreliable for mcmc performance so it is a good  
 idea to assess this with other methods as well. 
 &quot;&quot;&quot;</span>
-<span class="hljs-comment"># nbCode:</span>
-<span class="hljs-comment">#   let </span>
-<span class="hljs-comment">#     ixs = toSeq(0 ..&lt; b0Samples.len-burnin)</span>
-<span class="hljs-comment">#     df = seqsToDf({</span>
-<span class="hljs-comment">#       &quot;ixs&quot;:ixs, </span>
-<span class="hljs-comment">#       &quot;b0&quot;:b0Samples[burnin..^1],</span>
-<span class="hljs-comment">#       &quot;b1&quot;:b1Samples[burnin..^1],</span>
-<span class="hljs-comment">#       &quot;sd&quot;:sdSamples[burnin..^1]})</span>
-
-<span class="hljs-comment">#   ggplot(df, aes(x=&quot;ixs&quot;, y=&quot;b0&quot;)) + </span>
-<span class="hljs-comment">#     geom_line() +</span>
-<span class="hljs-comment">#     ggsave(&quot;images/samples-b0.png&quot;)</span>
+nbCode:
+  <span class="hljs-keyword">let</span> 
+    ixs = toSeq(<span class="hljs-number">0</span> ..&lt; b0Samples.len-burnin)
+    df = seqsToDf({
+      <span class="hljs-string">&quot;ixs&quot;</span>:ixs, 
+      <span class="hljs-string">&quot;b0&quot;</span>:b0Samples[burnin..^<span class="hljs-number">1</span>],
+      <span class="hljs-string">&quot;b1&quot;</span>:b1Samples[burnin..^<span class="hljs-number">1</span>],
+      <span class="hljs-string">&quot;sd&quot;</span>:sdSamples[burnin..^<span class="hljs-number">1</span>]})
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b0&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
   
-<span class="hljs-comment">#   ggplot(df, aes(x=&quot;ixs&quot;, y=&quot;b1&quot;)) + </span>
-<span class="hljs-comment">#     geom_line() +</span>
-<span class="hljs-comment">#     ggsave(&quot;images/samples-b1.png&quot;)</span>
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b1&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
   
-<span class="hljs-comment">#   ggplot(df, aes(x=&quot;ixs&quot;, y=&quot;sd&quot;)) + </span>
-<span class="hljs-comment">#     geom_line() +</span>
-<span class="hljs-comment">#     ggsave(&quot;images/samples-sd.png&quot;)</span>
-<span class="hljs-comment"># nbImage(&quot;images/samples-b0.png&quot;)</span>
-<span class="hljs-comment"># nbImage(&quot;images/samples-b1.png&quot;)</span>
-<span class="hljs-comment"># nbImage(&quot;images/samples-sd.png&quot;)</span>
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;sd&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Histograms 
 
 &quot;&quot;&quot;</span>
-<span class="hljs-comment"># nbCode:</span>
-<span class="hljs-comment">#   ggplot(df, aes(&quot;b0&quot;)) +</span>
-<span class="hljs-comment">#     geom_histogram() +</span>
-<span class="hljs-comment">#     ggsave(&quot;images/hist-b0.png&quot;)</span>
+nbCode:
+  ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
   
-<span class="hljs-comment">#   ggplot(df, aes(&quot;b1&quot;)) +</span>
-<span class="hljs-comment">#     geom_histogram() +</span>
-<span class="hljs-comment">#     ggsave(&quot;images/hist-b1.png&quot;)</span>
+  ggplot(df, aes(<span class="hljs-string">&quot;b1&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
   
-<span class="hljs-comment">#   ggplot(df, aes(&quot;sd&quot;)) +</span>
-<span class="hljs-comment">#     geom_histogram() +</span>
-<span class="hljs-comment">#     ggsave(&quot;images/hist-sd.png&quot;)</span>
-<span class="hljs-comment"># nbImage(&quot;images/hist-b0.png&quot;)</span>
-<span class="hljs-comment"># nbImage(&quot;images/hist-b1.png&quot;)</span>
-<span class="hljs-comment"># nbImage(&quot;images/hist-sd.png&quot;)</span>
+  ggplot(df, aes(<span class="hljs-string">&quot;sd&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Standardize Data
+&quot;&quot;&quot;</span>
+nbCode: 
+  <span class="hljs-keyword">var</span> 
+    stX = newSeq[<span class="hljs-built_in">float</span>](n)
+    stY = newSeq[<span class="hljs-built_in">float</span>](n)
+    meanX = mean(x) 
+    sdX = standardDeviation(x)
+    meanY = mean(y) 
+    sdY = standardDeviation(y)
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n:
+    stX[i] = (x[i] - meanX) / sdX 
+    stY[i] = (y[i] - meanY) / sdY
+
+nbCode:
+  <span class="hljs-keyword">var</span> standardized = seqsToDf(stX, stY)
+  ggplot(standardized, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) +
+    geom_point() +
+    ggsave(<span class="hljs-string">&quot;images/st-simulated-data.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/st-simulated-data.png&quot;</span>)
+
+nbCode:
+  <span class="hljs-keyword">var</span> 
+    (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot; 
+### Convert back to original scale
+$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
+$$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$ 
+Is this right?
+$$ \beta_{0} = \zeta_{SD} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
+
+&quot;&quot;&quot;</span>
+nbCode: 
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:
+    b0StSamples[i] = b0StSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
+    b1StSamples[i] = b1StSamples[i] * sdY / sdX 
+    sdStSamples[i] = sdStSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+### Means and HDIs
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">let</span>
+    meanStB0 = mean(b0StSamples[burnin..^<span class="hljs-number">1</span>])
+    meanStB1 = mean(b1StSamples[burnin..^<span class="hljs-number">1</span>])
+    meanStSd = mean(sdStSamples[burnin..^<span class="hljs-number">1</span>])
+  <span class="hljs-keyword">echo</span> meanStB0
+  <span class="hljs-keyword">echo</span> meanStB1
+  <span class="hljs-keyword">echo</span> meanStSd
+
+  <span class="hljs-keyword">let</span> 
+    (b0StHdiMin, b0StHdiMax) = hdi(b0StSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+    (b1StHdiMin, b1StHdiMax) = hdi(b1StSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+    (sdStHdiMin, sdStHdiMax) = hdi(sdStSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+  <span class="hljs-keyword">echo</span> b0StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b0StHdiMax
+  <span class="hljs-keyword">echo</span> b1StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b1StHdiMax
+  <span class="hljs-keyword">echo</span> sdStHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdStHdiMax
+  <span class="hljs-keyword">let</span> 
+    stDf = seqsToDf({
+      <span class="hljs-string">&quot;ixs&quot;</span>:ixs, 
+      <span class="hljs-string">&quot;b0&quot;</span>:b0StSamples[burnin..^<span class="hljs-number">1</span>],
+      <span class="hljs-string">&quot;b1&quot;</span>:b1StSamples[burnin..^<span class="hljs-number">1</span>],
+      <span class="hljs-string">&quot;sd&quot;</span>:sdStSamples[burnin..^<span class="hljs-number">1</span>]})
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+### Plots
+&quot;&quot;&quot;</span>
+nbCode:
+  ggplot(stDf, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b0&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/st-samples-b0.png&quot;</span>)
+  
+  ggplot(stDf, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b1&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/st-samples-b1.png&quot;</span>)
+  
+  ggplot(stDf, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;sd&quot;</span>)) + 
+    geom_line() +
+    ggsave(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)
+
+  ggplot(stDf, aes(<span class="hljs-string">&quot;b0&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
+  
+  ggplot(stDf, aes(<span class="hljs-string">&quot;b1&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
+  
+  ggplot(stDf, aes(<span class="hljs-string">&quot;sd&quot;</span>)) +
+    geom_histogram() +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)
+
+nbImage(<span class="hljs-string">&quot;images/st-samples-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/st-samples-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)
+
+nbImage(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)
+
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
