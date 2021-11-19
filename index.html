@@ -217,8 +217,8 @@ The steps of this algorithm are as follows:</p>
 
 <span class="hljs-keyword">var</span>
   nSamples = <span class="hljs-number">100000</span>
-  (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>,
-      <span class="hljs-number">0.1</span>)</code></pre>
+  (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">0.1</span>,
+      <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)</code></pre>
 <h1>Burnin</h1>
 <p>Initially the mcmc chain may spend time exploring unlikely regions of
 parameter space. We can get a better approximation of the posterior if we
@@ -239,9 +239,9 @@ the mean. Let's see how close these values are to the true values of the paramet
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.002775107229619194
-1.000429152353974
-1.125313329690522
+<pre><samp>-0.04145095272428544
+0.999004531049537
+1.077208073147164
 </samp></pre>
 <h1>Highest density interval</h1>
 <p>The means give us a point estimate for our parameter values but they tell us
@@ -271,9 +271,9 @@ looking at the highest density interval.</p>
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.5326155208898431 0.4460144939107637
-0.992316502107233 1.00891980911337
-0.9663992112292861 1.286030093739193
+<pre><samp>-0.5643466018940605 0.3944481959585089
+0.9912095534185615 1.007496392211573
+0.933831185636587 1.228903768832325
 </samp></pre>
 <h1>Trace plots</h1>
 <p>We can get a sense for how well our mcmc performed and therefore gain some<br />
@@ -348,6 +348,7 @@ StatusSuccess output of write_to_png
 <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n:
   stX[i] = (x[i] - meanX) / sdX
   stY[i] = (y[i] - meanY) / sdY</code></pre>
+<p>We can see that these data are now centered around zero and have the same scale.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">var</span> standardized = seqsToDf(stX, stY)
 ggplot(standardized, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) + geom_point() +
     ggsave(<span class="hljs-string">&quot;images/st-simulated-data.png&quot;</span>)</code></pre>
@@ -358,13 +359,16 @@ ggplot(standardized, aes(<span class="hljs-string">&quot;x&quot;</span>, <span c
 <figcaption></figcaption>
 </figure>
 
-<pre><code class="nim hljs"><span class="hljs-keyword">var</span> (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>,
+<p>We can run the MCMC as before with some slight changes. Since our data are on a<br />
+different scale, the proposals we were making before wont work very well. So
+we should make the proposed changes smaller.</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span> (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>,
     <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)</code></pre>
 <h3>Convert back to original scale</h3>
 <p>$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$<br />
 $$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$
 Is this right?
-$$ \beta_{0} = \zeta_{SD} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$</p>
+$$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:
   b0StSamples[i] = b0StSamples[i] * sdY + meanY -
       b1StSamples[i] * sdY * meanX / sdX
@@ -389,12 +393,12 @@ $$ \beta_{0} = \zeta_{SD} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$</p
 <span class="hljs-keyword">let</span> stDf = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: ixs, <span class="hljs-string">&quot;b0&quot;</span>: b0StSamples[burnin ..^ <span class="hljs-number">1</span>],
                      <span class="hljs-string">&quot;b1&quot;</span>: b1StSamples[burnin ..^ <span class="hljs-number">1</span>],
                      <span class="hljs-string">&quot;sd&quot;</span>: sdStSamples[burnin ..^ <span class="hljs-number">1</span>]})</code></pre>
-<pre><samp>0.02178682696477597
-1.000047917231239
-1.235752301390908
--0.5228674329792611 0.5614092702740123
-0.9910823827888459 1.009720278197477
-0.6955795718746316 1.733878746537485
+<pre><samp>0.00065363619207229
+0.9983674001414232
+1.254999294297894
+-0.5586095619170663 0.5569507163840655
+0.9891454068954827 1.008214755395163
+0.7246875719879213 1.78933671391998
 </samp></pre>
 <h3>Plots</h3>
 <pre><code class="nim hljs">ggplot(stDf, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line() +
@@ -684,7 +688,7 @@ nbCode:
     <span class="hljs-literal">result</span> = (b0Samples, b1Samples, sdSamples)
   <span class="hljs-keyword">var</span>
     nSamples = <span class="hljs-number">100000</span>
-    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>) 
+    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>) 
   
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
@@ -781,7 +785,6 @@ nbImage(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Histograms 
-
 &quot;&quot;&quot;</span>
 nbCode:
   ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) +
@@ -815,6 +818,10 @@ nbCode:
     stX[i] = (x[i] - meanX) / sdX 
     stY[i] = (y[i] - meanY) / sdY
 
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+We can see that these data are now centered around zero and have the same scale.
+&quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">var</span> standardized = seqsToDf(stX, stY)
   ggplot(standardized, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) +
@@ -822,9 +829,15 @@ nbCode:
     ggsave(<span class="hljs-string">&quot;images/st-simulated-data.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-simulated-data.png&quot;</span>)
 
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+We can run the MCMC as before with some slight changes. Since our data are on a  
+different scale, the proposals we were making before wont work very well. So
+we should make the proposed changes smaller.
+&quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">var</span> 
-    (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
+    (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot; 
@@ -832,14 +845,14 @@ nbText: <span class="hljs-string">md&quot;&quot;&quot;
 $$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 $$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$ 
 Is this right?
-$$ \beta_{0} = \zeta_{SD} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
-
+$$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 &quot;&quot;&quot;</span>
 nbCode: 
   <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:
     b0StSamples[i] = b0StSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
     b1StSamples[i] = b1StSamples[i] * sdY / sdX 
     sdStSamples[i] = sdStSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
+
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 ### Means and HDIs
@@ -866,6 +879,7 @@ nbCode:
       <span class="hljs-string">&quot;b0&quot;</span>:b0StSamples[burnin..^<span class="hljs-number">1</span>],
       <span class="hljs-string">&quot;b1&quot;</span>:b1StSamples[burnin..^<span class="hljs-number">1</span>],
       <span class="hljs-string">&quot;sd&quot;</span>:sdStSamples[burnin..^<span class="hljs-number">1</span>]})
+
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 ### Plots
@@ -902,7 +916,6 @@ nbImage(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)
-
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;

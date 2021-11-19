@@ -220,7 +220,7 @@ nbCode:
     result = (b0Samples, b1Samples, sdSamples)
   var
     nSamples = 100000
-    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, 0, 1, 1, 0.1, 0.1, 0.1) 
+    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, 0.0, 1.0, 1.0, 0.1, 0.1, 0.1) 
   
 
 nbText: md"""
@@ -317,7 +317,6 @@ nbImage("images/samples-sd.png")
 
 nbText: md"""
 # Histograms 
-
 """
 nbCode:
   ggplot(df, aes("b0")) +
@@ -351,6 +350,10 @@ nbCode:
     stX[i] = (x[i] - meanX) / sdX 
     stY[i] = (y[i] - meanY) / sdY
 
+
+nbText: md"""
+We can see that these data are now centered around zero and have the same scale.
+"""
 nbCode:
   var standardized = seqsToDf(stX, stY)
   ggplot(standardized, aes("x", "y")) +
@@ -358,9 +361,15 @@ nbCode:
     ggsave("images/st-simulated-data.png")
 nbImage("images/st-simulated-data.png")
 
+
+nbText: md"""
+We can run the MCMC as before with some slight changes. Since our data are on a  
+different scale, the proposals we were making before wont work very well. So
+we should make the proposed changes smaller.
+"""
 nbCode:
   var 
-    (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, 0, 0, 1, 0.01, 0.01, 0.01) 
+    (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, 0, 1, 1, 0.01, 0.01, 0.01) 
 
 
 nbText: md""" 
@@ -368,14 +377,14 @@ nbText: md"""
 $$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 $$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$ 
 Is this right?
-$$ \beta_{0} = \zeta_{SD} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
-
+$$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 """
 nbCode: 
   for i in 0 ..< nSamples:
     b0StSamples[i] = b0StSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
     b1StSamples[i] = b1StSamples[i] * sdY / sdX 
     sdStSamples[i] = sdStSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
+
 
 nbText: md"""
 ### Means and HDIs
@@ -402,6 +411,7 @@ nbCode:
       "b0":b0StSamples[burnin..^1],
       "b1":b1StSamples[burnin..^1],
       "sd":sdStSamples[burnin..^1]})
+
 
 nbText: md"""
 ### Plots
@@ -438,7 +448,6 @@ nbImage("images/st-samples-sd.png")
 nbImage("images/st-hist-b0.png")
 nbImage("images/st-hist-b1.png")
 nbImage("images/st-hist-sd.png")
-
 
 
 nbText: md"""
