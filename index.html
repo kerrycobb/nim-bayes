@@ -103,13 +103,13 @@ ggplot(sim, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hlj
 <h1>Priors</h1>
 <p>We need to choose prior probability distributions for each of the parameters
 that we are estimating.  Let's use a normal distribution for the priors on
-$\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter be a positive value greater
-than 0 so let's use the gamma distribution.</p>
+$\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter must be a positive value
+greater than 0 so let's use the gamma distribution as the prior on $\tau$.</p>
 <p>$$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$
 $$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$
 $$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$</p>
-<p>Since this tutorial is for the purpose of demonstration, let's use very informed
-priors so that we can get a good sample from the posterior more quickly.</p>
+<p>Since this is for the purpose of demonstration, let's use very informed
+priors so that we can quickly get a good sample from the posterior.</p>
 <p>$$ \beta_{0} \sim Normal(0, 1)$$
 $$ \beta_{1} \sim Normal(1, 1)$$
 $$ \tau \sim Gamma(1, 1)$$</p>
@@ -217,64 +217,11 @@ The steps of this algorithm are as follows:</p>
 
 <span class="hljs-keyword">var</span>
   nSamples = <span class="hljs-number">100000</span>
-  (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">0.1</span>,
-      <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)</code></pre>
-<h1>Burnin</h1>
-<p>Initially the mcmc chain may spend time exploring unlikely regions of
-parameter space. We can get a better approximation of the posterior if we
-exclude these early steps in the chain. These excluded samples are referred to<br />
-as the burnin. A burnin of $10%$ seems to work well with our informative priors
-and starting values.</p>
-<pre><code class="nim hljs"><span class="hljs-keyword">let</span> burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span></code></pre>
-<h1>Posterior means</h1>
-<p>One way to summarize the estimates from the posterior distribution is to calculate
-the mean. Let's see how close these values are to the true values of the parameters.</p>
-<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
-  stats
-
-<span class="hljs-keyword">let</span>
-  meanB0 = mean(b0Samples[burnin ..^ <span class="hljs-number">1</span>])
-  meanB1 = mean(b1Samples[burnin ..^ <span class="hljs-number">1</span>])
-  meanSd = mean(sdSamples[burnin ..^ <span class="hljs-number">1</span>])
-<span class="hljs-keyword">echo</span> meanB0
-<span class="hljs-keyword">echo</span> meanB1
-<span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.04145095272428544
-0.999004531049537
-1.077208073147164
-</samp></pre>
-<h1>Highest density interval</h1>
-<p>The means give us a point estimate for our parameter values but they tell us
-nothing about the uncertainty of our estimate. We can get a sense for that by
-looking at the highest density interval.</p>
-<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
-  algorithm
-
-<span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =
-  <span class="hljs-keyword">let</span>
-    sortedSamples = sorted(samples, system.cmp[<span class="hljs-built_in">float</span>])
-    ciIdxInc = <span class="hljs-built_in">int</span>(floor(credMass * <span class="hljs-built_in">float</span>(sortedSamples.len)))
-    nCIs = sortedSamples.len - ciIdxInc
-  <span class="hljs-keyword">var</span> ciWidth = newSeq[<span class="hljs-built_in">float</span>](nCIs)
-  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nCIs:
-    ciWidth[i] = sortedSamples[i + ciIdxInc] - sortedSamples[i]
-  <span class="hljs-keyword">let</span>
-    minCiWidthIx = minIndex(ciWidth)
-    hdiMin = sortedSamples[minCiWidthIx]
-    hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
-  <span class="hljs-literal">result</span> = (hdiMin, hdiMax)
-
-<span class="hljs-keyword">let</span>
-  (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-  (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-  (sdHdiMin, sdHdiMax) = hdi(sdSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-<span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
-<span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
-<span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.5643466018940605 0.3944481959585089
-0.9912095534185615 1.007496392211573
-0.933831185636587 1.228903768832325
-</samp></pre>
+  (b0Samples1, b1Samples1, sdSamples1) = mcmc(x, y, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>,
+      <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)</code></pre>
+<p>Should do another chain with different starting values</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span> (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.9</span>,
+    <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)</code></pre>
 <h1>Trace plots</h1>
 <p>We can get a sense for how well our mcmc performed and therefore gain some<br />
 sense for how good our estimates might be by looking at the trace plot which
@@ -282,21 +229,26 @@ shows the parameter value store during each step in the mcmc chain. Either
 the accepted proposal or the previous one if the a proposal is rejected. Trace
 plots can be unreliable for mcmc performance so it is a good<br />
 idea to assess this with other methods as well.</p>
-<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
-  ixs = toSeq(<span class="hljs-number">0</span> ..&lt; b0Samples.len - burnin)
-  df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: ixs, <span class="hljs-string">&quot;b0&quot;</span>: b0Samples[burnin ..^ <span class="hljs-number">1</span>],
-                 <span class="hljs-string">&quot;b1&quot;</span>: b1Samples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-string">&quot;sd&quot;</span>: sdSamples[burnin ..^ <span class="hljs-number">1</span>]})
-ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line() +
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span>
+  ixs = toSeq(<span class="hljs-number">0</span> .. nSamples)
+  df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>), <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, nSamples + <span class="hljs-number">1</span>),
+      repeat(<span class="hljs-number">2</span>, nSamples + <span class="hljs-number">1</span>)), <span class="hljs-string">&quot;b0&quot;</span>: concat(b0Samples1, b0Samples2),
+                 <span class="hljs-string">&quot;b1&quot;</span>: concat(b1Samples1, b1Samples2),
+                 <span class="hljs-string">&quot;sd&quot;</span>: concat(sdSamples1, sdSamples2)})
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line(aes(color = <span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
-ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b1&quot;</span>)) + geom_line() +
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b1&quot;</span>)) + geom_line(aes(color = <span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
-ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;sd&quot;</span>)) + geom_line() +
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;sd&quot;</span>)) + geom_line(aes(color = <span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)</code></pre>
 <pre><samp>INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
 INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
 INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
 </samp></pre>
 <figure>
@@ -314,12 +266,36 @@ StatusSuccess output of write_to_png
 <figcaption></figcaption>
 </figure>
 
+<h1>Burnin</h1>
+<p>Initially the mcmc chain may spend time exploring unlikely regions of
+parameter space. We can get a better approximation of the posterior if we
+exclude these early steps in the chain. These excluded samples are referred to<br />
+as the burnin. A burnin of $10%$ seems to work well with our informative priors
+and starting values.</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span>
+  burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span>
+  b0Burn = concat(b0Samples1[burnin ..^ <span class="hljs-number">1</span>], b0Samples2[burnin ..^ <span class="hljs-number">1</span>])
+  b1Burn = concat(b1Samples1[burnin ..^ <span class="hljs-number">1</span>], b1Samples2[burnin ..^ <span class="hljs-number">1</span>])
+  sdBurn = concat(sdSamples1[burnin ..^ <span class="hljs-number">1</span>], sdSamples2[burnin ..^ <span class="hljs-number">1</span>])</code></pre>
 <h1>Histograms</h1>
-<pre><code class="nim hljs">ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
-ggplot(df, aes(<span class="hljs-string">&quot;b1&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
-ggplot(df, aes(<span class="hljs-string">&quot;sd&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)</code></pre>
-<pre><samp>StatusSuccess output of write_to_png
+<pre><code class="nim hljs">ixs = toSeq(<span class="hljs-number">0</span> .. nSamples - burnin)
+df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>),
+               <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, ixs.len), repeat(<span class="hljs-number">2</span>, ixs.len)),
+               <span class="hljs-string">&quot;b0&quot;</span>: b0Burn, <span class="hljs-string">&quot;b1&quot;</span>: b1Burn, <span class="hljs-string">&quot;sd&quot;</span>: sdBurn})
+ggplot(df, aes(x = <span class="hljs-string">&quot;b0&quot;</span>, fill = <span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position = <span class="hljs-string">&quot;identity&quot;</span>, alpha = some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;b1&quot;</span>, fill = <span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position = <span class="hljs-string">&quot;identity&quot;</span>, alpha = some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;sd&quot;</span>, fill = <span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position = <span class="hljs-string">&quot;identity&quot;</span>, alpha = some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)</code></pre>
+<pre><samp>INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
+StatusSuccess output of write_to_png
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
 </samp></pre>
 <figure>
@@ -337,7 +313,96 @@ StatusSuccess output of write_to_png
 <figcaption></figcaption>
 </figure>
 
+<h1>Posterior means</h1>
+<p>One way to summarize the estimates from the posterior distribution is to calculate
+the mean. Let's see how close these values are to the true values of the parameters.</p>
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  stats
+
+<span class="hljs-keyword">var</span>
+  meanB0 = mean(b0Burn)
+  meanB1 = mean(b1Burn)
+  meanSd = mean(sdBurn)
+<span class="hljs-keyword">echo</span> meanB0
+<span class="hljs-keyword">echo</span> meanB1
+<span class="hljs-keyword">echo</span> meanSd</code></pre>
+<pre><samp>-0.3239560905850797
+1.008189709400152
+0.849210855656735
+</samp></pre>
+<h1>Credible Intervals</h1>
+<p>We The means give us a point estimate for our parameter values but they tell us
+nothing about the uncertaintly of our estimates. We can get a sense for that by
+looking at credible intervals. There are two widely used approaches for this,
+equal tailed intervals, and highest density intervals. These will often match
+each other closely when the target distribution is unimodal and symetric.
+We will calculate the 89% interval for each of these below. Why 89%? Why not?
+Credible interval threshold values are completely arbitrary.</p>
+<h2>Equal Tailed Interval</h2>
+<pre><code class="nim hljs"><span class="hljs-keyword">import</span>
+  algorithm
+
+<span class="hljs-keyword">proc</span> quantile(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; interval: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
+  <span class="hljs-keyword">let</span>
+    s = sorted(samples, system.cmp[<span class="hljs-built_in">float</span>])
+    k = <span class="hljs-built_in">float</span>(s.len - <span class="hljs-number">1</span>) * interval
+    f = floor(k)
+    c = ceil(k)
+  <span class="hljs-keyword">if</span> f == c:
+    <span class="hljs-literal">result</span> = s[<span class="hljs-built_in">int</span>(k)]
+  <span class="hljs-keyword">else</span>:
+    <span class="hljs-keyword">let</span>
+      d0 = s[<span class="hljs-built_in">int</span>(f)] * (c - k)
+      d1 = s[<span class="hljs-built_in">int</span>(c)] * (k - f)
+    <span class="hljs-literal">result</span> = d0 + d1
+
+<span class="hljs-keyword">proc</span> eti(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; interval: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =
+  <span class="hljs-keyword">let</span> p = (<span class="hljs-number">1</span> - interval) / <span class="hljs-number">2</span>
+  <span class="hljs-keyword">let</span>
+    q0 = quantile(samples, p)
+    q1 = quantile(samples, <span class="hljs-number">1</span> - p)
+  <span class="hljs-literal">result</span> = (q0, q1)
+
+<span class="hljs-keyword">var</span>
+  (b0EtiMin, b0EtiMax) = eti(b0Burn, <span class="hljs-number">0.89</span>)
+  (b1EtiMin, b1EtiMax) = eti(b1Burn, <span class="hljs-number">0.89</span>)
+  (sdEtiMin, sdEtiMax) = eti(sdBurn, <span class="hljs-number">0.89</span>)
+<span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
+<span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
+<span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
+<pre><samp>-0.6170517917322343 -0.008467188688193572
+1.002991915598452 1.013250364425417
+0.7541564440854457 0.9540643872406819
+</samp></pre>
+<h2>Highest Density Interval</h2>
+<pre><code class="nim hljs"><span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =
+  <span class="hljs-keyword">let</span>
+    sortedSamples = sorted(samples, system.cmp[<span class="hljs-built_in">float</span>])
+    ciIdxInc = <span class="hljs-built_in">int</span>(floor(credMass * <span class="hljs-built_in">float</span>(sortedSamples.len)))
+    nCIs = sortedSamples.len - ciIdxInc
+  <span class="hljs-keyword">var</span> ciWidth = newSeq[<span class="hljs-built_in">float</span>](nCIs)
+  <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nCIs:
+    ciWidth[i] = sortedSamples[i + ciIdxInc] - sortedSamples[i]
+  <span class="hljs-keyword">let</span>
+    minCiWidthIx = minIndex(ciWidth)
+    hdiMin = sortedSamples[minCiWidthIx]
+    hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
+  <span class="hljs-literal">result</span> = (hdiMin, hdiMax)
+
+<span class="hljs-keyword">var</span>
+  (b0HdiMin, b0HdiMax) = hdi(b0Burn, <span class="hljs-number">0.89</span>)
+  (b1HdiMin, b1HdiMax) = hdi(b1Burn, <span class="hljs-number">0.89</span>)
+  (sdHdiMin, sdHdiMax) = hdi(sdBurn, <span class="hljs-number">0.89</span>)
+<span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
+<span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
+<span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
+<pre><samp>-0.5800420499126808 0.0241196910410927
+1.003122485718627 1.013265832517531
+0.7433858302364954 0.9376893572599122
+</samp></pre>
 <h1>Standardize Data</h1>
+<p>We might be able to get even better mixing by standardizing the data and
+removing correlation between the slope and the intercept.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">var</span>
   stX = newSeq[<span class="hljs-built_in">float</span>](n)
   stY = newSeq[<span class="hljs-built_in">float</span>](n)
@@ -362,62 +427,49 @@ ggplot(standardized, aes(<span class="hljs-string">&quot;x&quot;</span>, <span c
 <p>We can run the MCMC as before with some slight changes. Since our data are on a<br />
 different scale, the proposals we were making before wont work very well. So
 we should make the proposed changes smaller.</p>
-<pre><code class="nim hljs"><span class="hljs-keyword">var</span> (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>,
+<p>We could also have changed our priors since the data are on a different scale
+but let's see what happens if we leave them the same.</p>
+<pre><code class="nim hljs">(b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>,
+    <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)
+(b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.01</span>, <span class="hljs-number">1.1</span>, <span class="hljs-number">1.1</span>,
     <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)</code></pre>
 <h3>Convert back to original scale</h3>
-<p>$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$<br />
+<p>To interpret these new estimates we can convert back to the original scale.
+$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$<br />
 $$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$
-Is this right?
+TODO: Need to confirm that this is correct:
 $$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:
-  b0StSamples[i] = b0StSamples[i] * sdY + meanY -
-      b1StSamples[i] * sdY * meanX / sdX
-  b1StSamples[i] = b1StSamples[i] * sdY / sdX
-  sdStSamples[i] = sdStSamples[i] * sdY + meanY -
-      b1StSamples[i] * sdY * meanX / sdX</code></pre>
-<h3>Means and HDIs</h3>
-<pre><code class="nim hljs"><span class="hljs-keyword">let</span>
-  meanStB0 = mean(b0StSamples[burnin ..^ <span class="hljs-number">1</span>])
-  meanStB1 = mean(b1StSamples[burnin ..^ <span class="hljs-number">1</span>])
-  meanStSd = mean(sdStSamples[burnin ..^ <span class="hljs-number">1</span>])
-<span class="hljs-keyword">echo</span> meanStB0
-<span class="hljs-keyword">echo</span> meanStB1
-<span class="hljs-keyword">echo</span> meanStSd
-<span class="hljs-keyword">let</span>
-  (b0StHdiMin, b0StHdiMax) = hdi(b0StSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-  (b1StHdiMin, b1StHdiMax) = hdi(b1StSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-  (sdStHdiMin, sdStHdiMax) = hdi(sdStSamples[burnin ..^ <span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-<span class="hljs-keyword">echo</span> b0StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b0StHdiMax
-<span class="hljs-keyword">echo</span> b1StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b1StHdiMax
-<span class="hljs-keyword">echo</span> sdStHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdStHdiMax
-<span class="hljs-keyword">let</span> stDf = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: ixs, <span class="hljs-string">&quot;b0&quot;</span>: b0StSamples[burnin ..^ <span class="hljs-number">1</span>],
-                     <span class="hljs-string">&quot;b1&quot;</span>: b1StSamples[burnin ..^ <span class="hljs-number">1</span>],
-                     <span class="hljs-string">&quot;sd&quot;</span>: sdStSamples[burnin ..^ <span class="hljs-number">1</span>]})</code></pre>
-<pre><samp>0.00065363619207229
-0.9983674001414232
-1.254999294297894
--0.5586095619170663 0.5569507163840655
-0.9891454068954827 1.008214755395163
-0.7246875719879213 1.78933671391998
-</samp></pre>
-<h3>Plots</h3>
-<pre><code class="nim hljs">ggplot(stDf, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line() +
+  b0Samples1[i] = b0Samples1[i] * sdY + meanY -
+      b1Samples1[i] * sdY * meanX / sdX
+  b1Samples1[i] = b1Samples1[i] * sdY / sdX
+  sdSamples1[i] = sdSamples1[i] * sdY + meanY -
+      b1Samples1[i] * sdY * meanX / sdX
+  b0Samples2[i] = b0Samples2[i] * sdY + meanY -
+      b1Samples2[i] * sdY * meanX / sdX
+  b1Samples2[i] = b1Samples2[i] * sdY / sdX
+  sdSamples2[i] = sdSamples2[i] * sdY + meanY -
+      b1Samples2[i] * sdY * meanX / sdX</code></pre>
+<h1>Traceplots</h1>
+<pre><code class="nim hljs">ixs = toSeq(<span class="hljs-number">0</span> .. nSamples)
+df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>), <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, nSamples + <span class="hljs-number">1</span>),
+    repeat(<span class="hljs-number">2</span>, nSamples + <span class="hljs-number">1</span>)), <span class="hljs-string">&quot;b0&quot;</span>: concat(b0Samples1, b0Samples2),
+               <span class="hljs-string">&quot;b1&quot;</span>: concat(b1Samples1, b1Samples2),
+               <span class="hljs-string">&quot;sd&quot;</span>: concat(sdSamples1, sdSamples2)})
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b0&quot;</span>)) + geom_line(aes(color = <span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/st-samples-b0.png&quot;</span>)
-ggplot(stDf, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b1&quot;</span>)) + geom_line() +
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;b1&quot;</span>)) + geom_line(aes(color = <span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/st-samples-b1.png&quot;</span>)
-ggplot(stDf, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;sd&quot;</span>)) + geom_line() +
-    ggsave(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)
-ggplot(stDf, aes(<span class="hljs-string">&quot;b0&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
-ggplot(stDf, aes(<span class="hljs-string">&quot;b1&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
-ggplot(stDf, aes(<span class="hljs-string">&quot;sd&quot;</span>)) + geom_histogram() + ggsave(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)</code></pre>
+ggplot(df, aes(x = <span class="hljs-string">&quot;ixs&quot;</span>, y = <span class="hljs-string">&quot;sd&quot;</span>)) + geom_line(aes(color = <span class="hljs-string">&quot;chain&quot;</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)</code></pre>
 <pre><samp>INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
 INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
 INFO: The integer column `ixs` has been automatically determined to be continuous. To overwrite this behavior add a `+ scale_x/y_discrete()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to. Or apply a `factor` to the column name in the `aes` call, i.e. `aes(..., factor(&quot;ixs&quot;), ...)`.
-StatusSuccess output of write_to_png
-StatusSuccess output of write_to_png
-StatusSuccess output of write_to_png
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
 StatusSuccess output of write_to_png
 </samp></pre>
 <figure>
@@ -435,6 +487,31 @@ StatusSuccess output of write_to_png
 <figcaption></figcaption>
 </figure>
 
+<h1>Burnin</h1>
+<pre><code class="nim hljs">b0Burn = concat(b0Samples1[burnin ..^ <span class="hljs-number">1</span>], b0Samples2[burnin ..^ <span class="hljs-number">1</span>])
+b1Burn = concat(b1Samples1[burnin ..^ <span class="hljs-number">1</span>], b1Samples2[burnin ..^ <span class="hljs-number">1</span>])
+sdBurn = concat(sdSamples1[burnin ..^ <span class="hljs-number">1</span>], sdSamples2[burnin ..^ <span class="hljs-number">1</span>])</code></pre>
+<h1>Histograms</h1>
+<pre><code class="nim hljs">ixs = toSeq(<span class="hljs-number">0</span> .. nSamples - burnin)
+df = seqsToDf({<span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>),
+               <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, ixs.len), repeat(<span class="hljs-number">2</span>, ixs.len)),
+               <span class="hljs-string">&quot;b0&quot;</span>: b0Burn, <span class="hljs-string">&quot;b1&quot;</span>: b1Burn, <span class="hljs-string">&quot;sd&quot;</span>: sdBurn})
+ggplot(df, aes(x = <span class="hljs-string">&quot;b0&quot;</span>, fill = <span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position = <span class="hljs-string">&quot;identity&quot;</span>, alpha = some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;b1&quot;</span>, fill = <span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position = <span class="hljs-string">&quot;identity&quot;</span>, alpha = some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
+ggplot(df, aes(x = <span class="hljs-string">&quot;sd&quot;</span>, fill = <span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position = <span class="hljs-string">&quot;identity&quot;</span>, alpha = some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)</code></pre>
+<pre><samp>INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
+StatusSuccess output of write_to_png
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
+StatusSuccess output of write_to_png
+INFO: The integer column `chain` has been automatically determined to be discrete. To overwrite this behavior add a `+ scale_x/y_continuous()` call to the plotting chain. Choose `x` or `y` depending on which axis this column refers to.
+StatusSuccess output of write_to_png
+</samp></pre>
 <figure>
 <img src="./images/st-hist-b0.png" alt="">
 <figcaption></figcaption>
@@ -450,6 +527,39 @@ StatusSuccess output of write_to_png
 <figcaption></figcaption>
 </figure>
 
+<h1>Posterior Means</h1>
+<pre><code class="nim hljs">meanB0 = mean(b0Burn)
+meanB1 = mean(b1Burn)
+meanSd = mean(sdBurn)
+<span class="hljs-keyword">echo</span> meanB0
+<span class="hljs-keyword">echo</span> meanB1
+<span class="hljs-keyword">echo</span> meanSd</code></pre>
+<pre><samp>-0.3551125923794411
+1.008640805768852
+0.1152425089023909
+</samp></pre>
+<h1>Equal Tailed Interval</h1>
+<pre><code class="nim hljs">(b0EtiMin, b0EtiMax) = eti(b0Burn, <span class="hljs-number">0.89</span>)
+(b1EtiMin, b1EtiMax) = eti(b1Burn, <span class="hljs-number">0.89</span>)
+(sdEtiMin, sdEtiMax) = eti(sdBurn, <span class="hljs-number">0.89</span>)
+<span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
+<span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
+<span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
+<pre><samp>-0.7372544461462738 0.01703279290945403
+1.002490005593506 1.0148922615613
+-0.2466404130246431 0.4890857276583773
+</samp></pre>
+<h1>Highest Density Interval</h1>
+<pre><code class="nim hljs">(b0HdiMin, b0HdiMax) = hdi(b0Burn, <span class="hljs-number">0.89</span>)
+(b1HdiMin, b1HdiMax) = hdi(b1Burn, <span class="hljs-number">0.89</span>)
+(sdHdiMin, sdHdiMax) = hdi(sdBurn, <span class="hljs-number">0.89</span>)
+<span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
+<span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
+<span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
+<pre><samp>-0.7310572080588926 0.02240049916583331
+1.002692477793619 1.015034181780213
+-0.2517505112806973 0.4822415687409958
+</samp></pre>
 <h1>Final Note</h1>
 <p>Of course we could have simply and more efficiently done this using least squares regression.
 However the Bayesian approach allows us to very easily and intuitively express
@@ -544,15 +654,15 @@ nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Priors
 We need to choose prior probability distributions for each of the parameters 
 that we are estimating.  Let's use a normal distribution for the priors on 
-$\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter be a positive value greater 
-than 0 so let's use the gamma distribution.
+$\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter must be a positive value 
+greater than 0 so let's use the gamma distribution as the prior on $\tau$.
 
 $$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$
 $$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$
 $$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$
 
-Since this tutorial is for the purpose of demonstration, let's use very informed
-priors so that we can get a good sample from the posterior more quickly.
+Since this is for the purpose of demonstration, let's use very informed
+priors so that we can quickly get a good sample from the posterior.
 
 $$ \beta_{0} \sim Normal(0, 1)$$
 $$ \beta_{1} \sim Normal(1, 1)$$
@@ -688,8 +798,53 @@ nbCode:
     <span class="hljs-literal">result</span> = (b0Samples, b1Samples, sdSamples)
   <span class="hljs-keyword">var</span>
     nSamples = <span class="hljs-number">100000</span>
-    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>) 
+    (b0Samples1, b1Samples1, sdSamples1) = mcmc(x, y, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>, 
+                                             <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>) 
   
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+Should do another chain with different starting values
+&quot;&quot;&quot;</span>
+
+nbCode:
+  <span class="hljs-keyword">var</span>
+    (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.9</span>, 
+                                                <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Trace plots 
+We can get a sense for how well our mcmc performed and therefore gain some  
+sense for how good our estimates might be by looking at the trace plot which 
+shows the parameter value store during each step in the mcmc chain. Either 
+the accepted proposal or the previous one if the a proposal is rejected. Trace
+plots can be unreliable for mcmc performance so it is a good  
+idea to assess this with other methods as well. 
+&quot;&quot;&quot;</span>
+nbCode:
+  <span class="hljs-keyword">var</span> 
+    ixs = toSeq(<span class="hljs-number">0</span> .. nSamples)
+    df = seqsToDf({
+      <span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>), 
+      <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, nSamples + <span class="hljs-number">1</span>), repeat(<span class="hljs-number">2</span>, nSamples + <span class="hljs-number">1</span>)), 
+      <span class="hljs-string">&quot;b0&quot;</span>: concat(b0Samples1, b0Samples2),
+      <span class="hljs-string">&quot;b1&quot;</span>: concat(b1Samples1, b1Samples2),
+      <span class="hljs-string">&quot;sd&quot;</span>: concat(sdSamples1, sdSamples2)})
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b0&quot;</span>)) + 
+    geom_line(aes(color=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b1&quot;</span>)) + 
+    geom_line(aes(color=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;sd&quot;</span>)) + 
+    geom_line(aes(color=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
+
+
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Burnin
@@ -700,7 +855,38 @@ as the burnin. A burnin of $10%$ seems to work well with our informative priors
 and starting values. 
 &quot;&quot;&quot;</span>
 nbCode:
-  <span class="hljs-keyword">let</span> burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span>
+  <span class="hljs-keyword">var</span> 
+    burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span>
+    b0Burn = concat(b0Samples1[burnin..^<span class="hljs-number">1</span>], b0Samples2[burnin..^<span class="hljs-number">1</span>])
+    b1Burn = concat(b1Samples1[burnin..^<span class="hljs-number">1</span>], b1Samples2[burnin..^<span class="hljs-number">1</span>])
+    sdBurn = concat(sdSamples1[burnin..^<span class="hljs-number">1</span>], sdSamples2[burnin..^<span class="hljs-number">1</span>])
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Histograms 
+&quot;&quot;&quot;</span>
+nbCode:
+  ixs = toSeq(<span class="hljs-number">0</span> .. nSamples - burnin)
+  df = seqsToDf({
+    <span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>), 
+    <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, ixs.len), repeat(<span class="hljs-number">2</span>, ixs.len)), 
+    <span class="hljs-string">&quot;b0&quot;</span>: b0Burn,
+    <span class="hljs-string">&quot;b1&quot;</span>: b1Burn,
+    <span class="hljs-string">&quot;sd&quot;</span>: sdBurn})
+  ggplot(df, aes(x=<span class="hljs-string">&quot;b0&quot;</span>, fill=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position=<span class="hljs-string">&quot;identity&quot;</span>, alpha=some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;b1&quot;</span>, fill=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position=<span class="hljs-string">&quot;identity&quot;</span>, alpha=some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;sd&quot;</span>, fill=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position=<span class="hljs-string">&quot;identity&quot;</span>, alpha=some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)
+
+nbImage(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
+nbImage(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
@@ -710,23 +896,65 @@ the mean. Let's see how close these values are to the true values of the paramet
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">import</span> stats
-  <span class="hljs-keyword">let</span>
-    meanB0 = mean(b0Samples[burnin..^<span class="hljs-number">1</span>])
-    meanB1 = mean(b1Samples[burnin..^<span class="hljs-number">1</span>])
-    meanSd = mean(sdSamples[burnin..^<span class="hljs-number">1</span>])
+  <span class="hljs-keyword">var</span> 
+    meanB0 = mean(b0Burn)
+    meanB1 = mean(b1Burn)
+    meanSd = mean(sdBurn)
   <span class="hljs-keyword">echo</span> meanB0
   <span class="hljs-keyword">echo</span> meanB1
   <span class="hljs-keyword">echo</span> meanSd
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-# Highest density interval
-The means give us a point estimate for our parameter values but they tell us 
-nothing about the uncertainty of our estimate. We can get a sense for that by 
-looking at the highest density interval. 
+# Credible Intervals
+We The means give us a point estimate for our parameter values but they tell us
+nothing about the uncertaintly of our estimates. We can get a sense for that by
+looking at credible intervals. There are two widely used approaches for this,
+equal tailed intervals, and highest density intervals. These will often match 
+each other closely when the target distribution is unimodal and symetric. 
+We will calculate the 89% interval for each of these below. Why 89%? Why not? 
+Credible interval threshold values are completely arbitrary.
+
+## Equal Tailed Interval 
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">import</span> algorithm
+
+  <span class="hljs-keyword">proc</span> quantile(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], interval: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
+    <span class="hljs-keyword">let</span> 
+      s = sorted(samples, system.cmp[<span class="hljs-built_in">float</span>])
+      k = <span class="hljs-built_in">float</span>(s.len - <span class="hljs-number">1</span>) * interval 
+      f = floor(k)
+      c = ceil(k)
+    <span class="hljs-keyword">if</span> f == c: 
+      <span class="hljs-literal">result</span> = s[<span class="hljs-built_in">int</span>(k)] 
+    <span class="hljs-keyword">else</span>:
+      <span class="hljs-keyword">let</span> 
+        d0 = s[<span class="hljs-built_in">int</span>(f)] * (c - k)
+        d1 = s[<span class="hljs-built_in">int</span>(c)] * (k - f)
+      <span class="hljs-literal">result</span> = d0 + d1
+
+  <span class="hljs-keyword">proc</span> eti(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], interval: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =  
+    <span class="hljs-keyword">let</span>    
+      p = (<span class="hljs-number">1</span> - interval) / <span class="hljs-number">2</span>
+    <span class="hljs-keyword">let</span>
+      q0 = quantile(samples, p)
+      q1 = quantile(samples, <span class="hljs-number">1</span> - p)
+    <span class="hljs-literal">result</span> = (q0, q1)
+  
+  <span class="hljs-keyword">var</span> 
+    (b0EtiMin, b0EtiMax) = eti(b0Burn, <span class="hljs-number">0.89</span>)
+    (b1EtiMin, b1EtiMax) = eti(b1Burn, <span class="hljs-number">0.89</span>)
+    (sdEtiMin, sdEtiMax) = eti(sdBurn, <span class="hljs-number">0.89</span>)
+  <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
+  <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
+  <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+## Highest Density Interval
+&quot;&quot;&quot;</span>
+nbCode:
   <span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>], credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =  
     <span class="hljs-keyword">let</span> 
       sortedSamples = sorted(samples, system.cmp[<span class="hljs-built_in">float</span>])
@@ -741,70 +969,22 @@ nbCode:
       hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
     <span class="hljs-literal">result</span> = (hdiMin, hdiMax)
 
-  <span class="hljs-keyword">let</span> 
-    (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-    (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-    (sdHdiMin, sdHdiMax) = hdi(sdSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
+  <span class="hljs-keyword">var</span> 
+    (b0HdiMin, b0HdiMax) = hdi(b0Burn, <span class="hljs-number">0.89</span>)
+    (b1HdiMin, b1HdiMax) = hdi(b1Burn, <span class="hljs-number">0.89</span>)
+    (sdHdiMin, sdHdiMax) = hdi(sdBurn, <span class="hljs-number">0.89</span>)
   <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
   <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
   <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax
 
 
-nbText: <span class="hljs-string">md&quot;&quot;&quot;
-# Trace plots 
-We can get a sense for how well our mcmc performed and therefore gain some  
-sense for how good our estimates might be by looking at the trace plot which 
-shows the parameter value store during each step in the mcmc chain. Either 
-the accepted proposal or the previous one if the a proposal is rejected. Trace
-plots can be unreliable for mcmc performance so it is a good  
-idea to assess this with other methods as well. 
-&quot;&quot;&quot;</span>
-nbCode:
-  <span class="hljs-keyword">let</span> 
-    ixs = toSeq(<span class="hljs-number">0</span> ..&lt; b0Samples.len-burnin)
-    df = seqsToDf({
-      <span class="hljs-string">&quot;ixs&quot;</span>:ixs, 
-      <span class="hljs-string">&quot;b0&quot;</span>:b0Samples[burnin..^<span class="hljs-number">1</span>],
-      <span class="hljs-string">&quot;b1&quot;</span>:b1Samples[burnin..^<span class="hljs-number">1</span>],
-      <span class="hljs-string">&quot;sd&quot;</span>:sdSamples[burnin..^<span class="hljs-number">1</span>]})
-  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b0&quot;</span>)) + 
-    geom_line() +
-    ggsave(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
-  
-  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b1&quot;</span>)) + 
-    geom_line() +
-    ggsave(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
-  
-  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;sd&quot;</span>)) + 
-    geom_line() +
-    ggsave(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
-nbImage(<span class="hljs-string">&quot;images/samples-b0.png&quot;</span>)
-nbImage(<span class="hljs-string">&quot;images/samples-b1.png&quot;</span>)
-nbImage(<span class="hljs-string">&quot;images/samples-sd.png&quot;</span>)
-
-
-nbText: <span class="hljs-string">md&quot;&quot;&quot;
-# Histograms 
-&quot;&quot;&quot;</span>
-nbCode:
-  ggplot(df, aes(<span class="hljs-string">&quot;b0&quot;</span>)) +
-    geom_histogram() +
-    ggsave(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
-  
-  ggplot(df, aes(<span class="hljs-string">&quot;b1&quot;</span>)) +
-    geom_histogram() +
-    ggsave(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
-  
-  ggplot(df, aes(<span class="hljs-string">&quot;sd&quot;</span>)) +
-    geom_histogram() +
-    ggsave(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)
-nbImage(<span class="hljs-string">&quot;images/hist-b0.png&quot;</span>)
-nbImage(<span class="hljs-string">&quot;images/hist-b1.png&quot;</span>)
-nbImage(<span class="hljs-string">&quot;images/hist-sd.png&quot;</span>)
+<span class="hljs-comment"># # TODO: Add support interval calculation</span>
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Standardize Data
+We might be able to get even better mixing by standardizing the data and 
+removing correlation between the slope and the intercept.
 &quot;&quot;&quot;</span>
 nbCode: 
   <span class="hljs-keyword">var</span> 
@@ -834,88 +1014,132 @@ nbText: <span class="hljs-string">md&quot;&quot;&quot;
 We can run the MCMC as before with some slight changes. Since our data are on a  
 different scale, the proposals we were making before wont work very well. So
 we should make the proposed changes smaller.
+
+We could also have changed our priors since the data are on a different scale
+but let's see what happens if we leave them the same.
 &quot;&quot;&quot;</span>
 nbCode:
-  <span class="hljs-keyword">var</span> 
-    (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
+  (b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
+  (b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.01</span>, <span class="hljs-number">1.1</span>, <span class="hljs-number">1.1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot; 
 ### Convert back to original scale
+To interpret these new estimates we can convert back to the original scale.
 $$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 $$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$ 
-Is this right?
+TODO: Need to confirm that this is correct:
 $$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 &quot;&quot;&quot;</span>
 nbCode: 
   <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:
-    b0StSamples[i] = b0StSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
-    b1StSamples[i] = b1StSamples[i] * sdY / sdX 
-    sdStSamples[i] = sdStSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
+    b0Samples1[i] = b0Samples1[i] * sdY + meanY - b1Samples1[i] * sdY * meanX / sdX
+    b1Samples1[i] = b1Samples1[i] * sdY / sdX 
+    sdSamples1[i] = sdSamples1[i] * sdY + meanY - b1Samples1[i] * sdY * meanX / sdX
+    b0Samples2[i] = b0Samples2[i] * sdY + meanY - b1Samples2[i] * sdY * meanX / sdX
+    b1Samples2[i] = b1Samples2[i] * sdY / sdX 
+    sdSamples2[i] = sdSamples2[i] * sdY + meanY - b1Samples2[i] * sdY * meanX / sdX
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
-### Means and HDIs
+# Traceplots
 &quot;&quot;&quot;</span>
 nbCode:
-  <span class="hljs-keyword">let</span>
-    meanStB0 = mean(b0StSamples[burnin..^<span class="hljs-number">1</span>])
-    meanStB1 = mean(b1StSamples[burnin..^<span class="hljs-number">1</span>])
-    meanStSd = mean(sdStSamples[burnin..^<span class="hljs-number">1</span>])
-  <span class="hljs-keyword">echo</span> meanStB0
-  <span class="hljs-keyword">echo</span> meanStB1
-  <span class="hljs-keyword">echo</span> meanStSd
-
-  <span class="hljs-keyword">let</span> 
-    (b0StHdiMin, b0StHdiMax) = hdi(b0StSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-    (b1StHdiMin, b1StHdiMax) = hdi(b1StSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-    (sdStHdiMin, sdStHdiMax) = hdi(sdStSamples[burnin..^<span class="hljs-number">1</span>], <span class="hljs-number">0.95</span>)
-  <span class="hljs-keyword">echo</span> b0StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b0StHdiMax
-  <span class="hljs-keyword">echo</span> b1StHdiMin, <span class="hljs-string">&quot; &quot;</span>, b1StHdiMax
-  <span class="hljs-keyword">echo</span> sdStHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdStHdiMax
-  <span class="hljs-keyword">let</span> 
-    stDf = seqsToDf({
-      <span class="hljs-string">&quot;ixs&quot;</span>:ixs, 
-      <span class="hljs-string">&quot;b0&quot;</span>:b0StSamples[burnin..^<span class="hljs-number">1</span>],
-      <span class="hljs-string">&quot;b1&quot;</span>:b1StSamples[burnin..^<span class="hljs-number">1</span>],
-      <span class="hljs-string">&quot;sd&quot;</span>:sdStSamples[burnin..^<span class="hljs-number">1</span>]})
-
-
-nbText: <span class="hljs-string">md&quot;&quot;&quot;
-### Plots
-&quot;&quot;&quot;</span>
-nbCode:
-  ggplot(stDf, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b0&quot;</span>)) + 
-    geom_line() +
+  ixs = toSeq(<span class="hljs-number">0</span> .. nSamples)
+  df = seqsToDf({
+    <span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>), 
+    <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, nSamples + <span class="hljs-number">1</span>), repeat(<span class="hljs-number">2</span>, nSamples + <span class="hljs-number">1</span>)), 
+    <span class="hljs-string">&quot;b0&quot;</span>: concat(b0Samples1, b0Samples2),
+    <span class="hljs-string">&quot;b1&quot;</span>: concat(b1Samples1, b1Samples2),
+    <span class="hljs-string">&quot;sd&quot;</span>: concat(sdSamples1, sdSamples2)})
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b0&quot;</span>)) + 
+    geom_line(aes(color=<span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/st-samples-b0.png&quot;</span>)
   
-  ggplot(stDf, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b1&quot;</span>)) + 
-    geom_line() +
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;b1&quot;</span>)) + 
+    geom_line(aes(color=<span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/st-samples-b1.png&quot;</span>)
   
-  ggplot(stDf, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;sd&quot;</span>)) + 
-    geom_line() +
+  ggplot(df, aes(x=<span class="hljs-string">&quot;ixs&quot;</span>, y=<span class="hljs-string">&quot;sd&quot;</span>)) + 
+    geom_line(aes(color=<span class="hljs-string">&quot;chain&quot;</span>)) +
     ggsave(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)
-
-  ggplot(stDf, aes(<span class="hljs-string">&quot;b0&quot;</span>)) +
-    geom_histogram() +
-    ggsave(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
-  
-  ggplot(stDf, aes(<span class="hljs-string">&quot;b1&quot;</span>)) +
-    geom_histogram() +
-    ggsave(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
-  
-  ggplot(stDf, aes(<span class="hljs-string">&quot;sd&quot;</span>)) +
-    geom_histogram() +
-    ggsave(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)
 
 nbImage(<span class="hljs-string">&quot;images/st-samples-b0.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-samples-b1.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-samples-sd.png&quot;</span>)
 
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Burnin
+&quot;&quot;&quot;</span>
+nbCode:
+  b0Burn = concat(b0Samples1[burnin..^<span class="hljs-number">1</span>], b0Samples2[burnin..^<span class="hljs-number">1</span>])
+  b1Burn = concat(b1Samples1[burnin..^<span class="hljs-number">1</span>], b1Samples2[burnin..^<span class="hljs-number">1</span>])
+  sdBurn = concat(sdSamples1[burnin..^<span class="hljs-number">1</span>], sdSamples2[burnin..^<span class="hljs-number">1</span>])
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Histograms
+&quot;&quot;&quot;</span>
+nbCode:
+  ixs = toSeq(<span class="hljs-number">0</span> .. nSamples - burnin)
+  df = seqsToDf({
+    <span class="hljs-string">&quot;ixs&quot;</span>: cycle(ixs, <span class="hljs-number">2</span>), 
+    <span class="hljs-string">&quot;chain&quot;</span>: concat(repeat(<span class="hljs-number">1</span>, ixs.len), repeat(<span class="hljs-number">2</span>, ixs.len)), 
+    <span class="hljs-string">&quot;b0&quot;</span>: b0Burn,
+    <span class="hljs-string">&quot;b1&quot;</span>: b1Burn,
+    <span class="hljs-string">&quot;sd&quot;</span>: sdBurn})
+  ggplot(df, aes(x=<span class="hljs-string">&quot;b0&quot;</span>, fill=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position=<span class="hljs-string">&quot;identity&quot;</span>, alpha=some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;b1&quot;</span>, fill=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position=<span class="hljs-string">&quot;identity&quot;</span>, alpha=some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
+  
+  ggplot(df, aes(x=<span class="hljs-string">&quot;sd&quot;</span>, fill=<span class="hljs-string">&quot;chain&quot;</span>)) +
+    geom_histogram(position=<span class="hljs-string">&quot;identity&quot;</span>, alpha=some(<span class="hljs-number">0.5</span>)) +
+    ggsave(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)
+
 nbImage(<span class="hljs-string">&quot;images/st-hist-b0.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-hist-b1.png&quot;</span>)
 nbImage(<span class="hljs-string">&quot;images/st-hist-sd.png&quot;</span>)
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Posterior Means
+&quot;&quot;&quot;</span>
+nbCode:
+  meanB0 = mean(b0Burn)
+  meanB1 = mean(b1Burn)
+  meanSd = mean(sdBurn)
+  <span class="hljs-keyword">echo</span> meanB0
+  <span class="hljs-keyword">echo</span> meanB1
+  <span class="hljs-keyword">echo</span> meanSd
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Equal Tailed Interval
+&quot;&quot;&quot;</span>
+nbCode:
+  (b0EtiMin, b0EtiMax) = eti(b0Burn, <span class="hljs-number">0.89</span>)
+  (b1EtiMin, b1EtiMax) = eti(b1Burn, <span class="hljs-number">0.89</span>)
+  (sdEtiMin, sdEtiMax) = eti(sdBurn, <span class="hljs-number">0.89</span>)
+  <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
+  <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
+  <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax
+
+
+nbText: <span class="hljs-string">md&quot;&quot;&quot;
+# Highest Density Interval
+&quot;&quot;&quot;</span>
+nbCode:
+  (b0HdiMin, b0HdiMax) = hdi(b0Burn, <span class="hljs-number">0.89</span>)
+  (b1HdiMin, b1HdiMax) = hdi(b1Burn, <span class="hljs-number">0.89</span>)
+  (sdHdiMin, sdHdiMax) = hdi(sdBurn, <span class="hljs-number">0.89</span>)
+  <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
+  <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
+  <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;

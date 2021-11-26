@@ -76,15 +76,15 @@ nbText: md"""
 # Priors
 We need to choose prior probability distributions for each of the parameters 
 that we are estimating.  Let's use a normal distribution for the priors on 
-$\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter be a positive value greater 
-than 0 so let's use the gamma distribution.
+$\beta_{0}$ and $\beta_{1}$ The $\tau$ parameter must be a positive value 
+greater than 0 so let's use the gamma distribution as the prior on $\tau$.
 
 $$ \beta_{0} \sim Normal(\mu_{0}, \tau_{0})$$
 $$ \beta_{1} \sim Normal(\mu_{1}, \tau_{1})$$
 $$ \tau \sim Gamma(\alpha_{0}, \beta_{0})$$
 
-Since this tutorial is for the purpose of demonstration, let's use very informed
-priors so that we can get a good sample from the posterior more quickly.
+Since this is for the purpose of demonstration, let's use very informed
+priors so that we can quickly get a good sample from the posterior.
 
 $$ \beta_{0} \sim Normal(0, 1)$$
 $$ \beta_{1} \sim Normal(1, 1)$$
@@ -220,8 +220,53 @@ nbCode:
     result = (b0Samples, b1Samples, sdSamples)
   var
     nSamples = 100000
-    (b0Samples, b1Samples, sdSamples) = mcmc(x, y, nSamples, 0.0, 1.0, 1.0, 0.1, 0.1, 0.1) 
+    (b0Samples1, b1Samples1, sdSamples1) = mcmc(x, y, nSamples, 0.0, 1.0, 1.0, 
+                                             0.1, 0.1, 0.1) 
   
+nbText: md"""
+Should do another chain with different starting values
+"""
+
+nbCode:
+  var
+    (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, 0.1, 0.9, 0.9, 
+                                                0.1, 0.1, 0.1)
+
+
+nbText: md"""
+# Trace plots 
+We can get a sense for how well our mcmc performed and therefore gain some  
+sense for how good our estimates might be by looking at the trace plot which 
+shows the parameter value store during each step in the mcmc chain. Either 
+the accepted proposal or the previous one if the a proposal is rejected. Trace
+plots can be unreliable for mcmc performance so it is a good  
+idea to assess this with other methods as well. 
+"""
+nbCode:
+  var 
+    ixs = toSeq(0 .. nSamples)
+    df = seqsToDf({
+      "ixs": cycle(ixs, 2), 
+      "chain": concat(repeat(1, nSamples + 1), repeat(2, nSamples + 1)), 
+      "b0": concat(b0Samples1, b0Samples2),
+      "b1": concat(b1Samples1, b1Samples2),
+      "sd": concat(sdSamples1, sdSamples2)})
+  ggplot(df, aes(x="ixs", y="b0")) + 
+    geom_line(aes(color="chain")) +
+    ggsave("images/samples-b0.png")
+  
+  ggplot(df, aes(x="ixs", y="b1")) + 
+    geom_line(aes(color="chain")) +
+    ggsave("images/samples-b1.png")
+  
+  ggplot(df, aes(x="ixs", y="sd")) + 
+    geom_line(aes(color="chain")) +
+    ggsave("images/samples-sd.png")
+nbImage("images/samples-b0.png")
+nbImage("images/samples-b1.png")
+nbImage("images/samples-sd.png")
+
+
 
 nbText: md"""
 # Burnin
@@ -232,7 +277,38 @@ as the burnin. A burnin of $10%$ seems to work well with our informative priors
 and starting values. 
 """
 nbCode:
-  let burnin = (nSamples.float * 0.1 + 1).int
+  var 
+    burnin = (nSamples.float * 0.1 + 1).int
+    b0Burn = concat(b0Samples1[burnin..^1], b0Samples2[burnin..^1])
+    b1Burn = concat(b1Samples1[burnin..^1], b1Samples2[burnin..^1])
+    sdBurn = concat(sdSamples1[burnin..^1], sdSamples2[burnin..^1])
+
+nbText: md"""
+# Histograms 
+"""
+nbCode:
+  ixs = toSeq(0 .. nSamples - burnin)
+  df = seqsToDf({
+    "ixs": cycle(ixs, 2), 
+    "chain": concat(repeat(1, ixs.len), repeat(2, ixs.len)), 
+    "b0": b0Burn,
+    "b1": b1Burn,
+    "sd": sdBurn})
+  ggplot(df, aes(x="b0", fill="chain")) +
+    geom_histogram(position="identity", alpha=some(0.5)) +
+    ggsave("images/hist-b0.png")
+  
+  ggplot(df, aes(x="b1", fill="chain")) +
+    geom_histogram(position="identity", alpha=some(0.5)) +
+    ggsave("images/hist-b1.png")
+  
+  ggplot(df, aes(x="sd", fill="chain")) +
+    geom_histogram(position="identity", alpha=some(0.5)) +
+    ggsave("images/hist-sd.png")
+
+nbImage("images/hist-b0.png")
+nbImage("images/hist-b1.png")
+nbImage("images/hist-sd.png")
 
 
 nbText: md"""
@@ -242,23 +318,65 @@ the mean. Let's see how close these values are to the true values of the paramet
 """
 nbCode:
   import stats
-  let
-    meanB0 = mean(b0Samples[burnin..^1])
-    meanB1 = mean(b1Samples[burnin..^1])
-    meanSd = mean(sdSamples[burnin..^1])
+  var 
+    meanB0 = mean(b0Burn)
+    meanB1 = mean(b1Burn)
+    meanSd = mean(sdBurn)
   echo meanB0
   echo meanB1
   echo meanSd
 
 
 nbText: md"""
-# Highest density interval
-The means give us a point estimate for our parameter values but they tell us 
-nothing about the uncertainty of our estimate. We can get a sense for that by 
-looking at the highest density interval. 
+# Credible Intervals
+We The means give us a point estimate for our parameter values but they tell us
+nothing about the uncertaintly of our estimates. We can get a sense for that by
+looking at credible intervals. There are two widely used approaches for this,
+equal tailed intervals, and highest density intervals. These will often match 
+each other closely when the target distribution is unimodal and symetric. 
+We will calculate the 89% interval for each of these below. Why 89%? Why not? 
+Credible interval threshold values are completely arbitrary.
+
+## Equal Tailed Interval 
 """
 nbCode:
   import algorithm
+
+  proc quantile(samples: seq[float], interval: float): float = 
+    let 
+      s = sorted(samples, system.cmp[float])
+      k = float(s.len - 1) * interval 
+      f = floor(k)
+      c = ceil(k)
+    if f == c: 
+      result = s[int(k)] 
+    else:
+      let 
+        d0 = s[int(f)] * (c - k)
+        d1 = s[int(c)] * (k - f)
+      result = d0 + d1
+
+  proc eti(samples: seq[float], interval: float): (float, float) =  
+    let    
+      p = (1 - interval) / 2
+    let
+      q0 = quantile(samples, p)
+      q1 = quantile(samples, 1 - p)
+    result = (q0, q1)
+  
+  var 
+    (b0EtiMin, b0EtiMax) = eti(b0Burn, 0.89)
+    (b1EtiMin, b1EtiMax) = eti(b1Burn, 0.89)
+    (sdEtiMin, sdEtiMax) = eti(sdBurn, 0.89)
+  echo b0EtiMin, " ", b0EtiMax
+  echo b1EtiMin, " ", b1EtiMax
+  echo sdEtiMin, " ", sdEtiMax
+
+
+nbText: md"""
+## Highest Density Interval
+"""
+nbCode:
   proc hdi(samples: seq[float], credMass: float): (float, float) =  
     let 
       sortedSamples = sorted(samples, system.cmp[float])
@@ -273,70 +391,22 @@ nbCode:
       hdiMax = sortedSamples[minCiWidthIx + ciIdxInc]
     result = (hdiMin, hdiMax)
 
-  let 
-    (b0HdiMin, b0HdiMax) = hdi(b0Samples[burnin..^1], 0.95)
-    (b1HdiMin, b1HdiMax) = hdi(b1Samples[burnin..^1], 0.95)
-    (sdHdiMin, sdHdiMax) = hdi(sdSamples[burnin..^1], 0.95)
+  var 
+    (b0HdiMin, b0HdiMax) = hdi(b0Burn, 0.89)
+    (b1HdiMin, b1HdiMax) = hdi(b1Burn, 0.89)
+    (sdHdiMin, sdHdiMax) = hdi(sdBurn, 0.89)
   echo b0HdiMin, " ", b0HdiMax
   echo b1HdiMin, " ", b1HdiMax
   echo sdHdiMin, " ", sdHdiMax
 
 
-nbText: md"""
-# Trace plots 
-We can get a sense for how well our mcmc performed and therefore gain some  
-sense for how good our estimates might be by looking at the trace plot which 
-shows the parameter value store during each step in the mcmc chain. Either 
-the accepted proposal or the previous one if the a proposal is rejected. Trace
-plots can be unreliable for mcmc performance so it is a good  
-idea to assess this with other methods as well. 
-"""
-nbCode:
-  let 
-    ixs = toSeq(0 ..< b0Samples.len-burnin)
-    df = seqsToDf({
-      "ixs":ixs, 
-      "b0":b0Samples[burnin..^1],
-      "b1":b1Samples[burnin..^1],
-      "sd":sdSamples[burnin..^1]})
-  ggplot(df, aes(x="ixs", y="b0")) + 
-    geom_line() +
-    ggsave("images/samples-b0.png")
-  
-  ggplot(df, aes(x="ixs", y="b1")) + 
-    geom_line() +
-    ggsave("images/samples-b1.png")
-  
-  ggplot(df, aes(x="ixs", y="sd")) + 
-    geom_line() +
-    ggsave("images/samples-sd.png")
-nbImage("images/samples-b0.png")
-nbImage("images/samples-b1.png")
-nbImage("images/samples-sd.png")
-
-
-nbText: md"""
-# Histograms 
-"""
-nbCode:
-  ggplot(df, aes("b0")) +
-    geom_histogram() +
-    ggsave("images/hist-b0.png")
-  
-  ggplot(df, aes("b1")) +
-    geom_histogram() +
-    ggsave("images/hist-b1.png")
-  
-  ggplot(df, aes("sd")) +
-    geom_histogram() +
-    ggsave("images/hist-sd.png")
-nbImage("images/hist-b0.png")
-nbImage("images/hist-b1.png")
-nbImage("images/hist-sd.png")
+# # TODO: Add support interval calculation
 
 
 nbText: md"""
 # Standardize Data
+We might be able to get even better mixing by standardizing the data and 
+removing correlation between the slope and the intercept.
 """
 nbCode: 
   var 
@@ -366,88 +436,132 @@ nbText: md"""
 We can run the MCMC as before with some slight changes. Since our data are on a  
 different scale, the proposals we were making before wont work very well. So
 we should make the proposed changes smaller.
+
+We could also have changed our priors since the data are on a different scale
+but let's see what happens if we leave them the same.
 """
 nbCode:
-  var 
-    (b0StSamples, b1StSamples, sdStSamples) = mcmc(stX, stY, nSamples, 0, 1, 1, 0.01, 0.01, 0.01) 
+  (b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, 0, 1, 1, 0.01, 0.01, 0.01) 
+  (b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, 0.01, 1.1, 1.1, 0.01, 0.01, 0.01) 
 
 
 nbText: md""" 
 ### Convert back to original scale
+To interpret these new estimates we can convert back to the original scale.
 $$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 $$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$ 
-Is this right?
+TODO: Need to confirm that this is correct:
 $$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
 """
 nbCode: 
   for i in 0 ..< nSamples:
-    b0StSamples[i] = b0StSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
-    b1StSamples[i] = b1StSamples[i] * sdY / sdX 
-    sdStSamples[i] = sdStSamples[i] * sdY + meanY - b1StSamples[i] * sdY * meanX / sdX
+    b0Samples1[i] = b0Samples1[i] * sdY + meanY - b1Samples1[i] * sdY * meanX / sdX
+    b1Samples1[i] = b1Samples1[i] * sdY / sdX 
+    sdSamples1[i] = sdSamples1[i] * sdY + meanY - b1Samples1[i] * sdY * meanX / sdX
+    b0Samples2[i] = b0Samples2[i] * sdY + meanY - b1Samples2[i] * sdY * meanX / sdX
+    b1Samples2[i] = b1Samples2[i] * sdY / sdX 
+    sdSamples2[i] = sdSamples2[i] * sdY + meanY - b1Samples2[i] * sdY * meanX / sdX
 
 
 nbText: md"""
-### Means and HDIs
+# Traceplots
 """
 nbCode:
-  let
-    meanStB0 = mean(b0StSamples[burnin..^1])
-    meanStB1 = mean(b1StSamples[burnin..^1])
-    meanStSd = mean(sdStSamples[burnin..^1])
-  echo meanStB0
-  echo meanStB1
-  echo meanStSd
-
-  let 
-    (b0StHdiMin, b0StHdiMax) = hdi(b0StSamples[burnin..^1], 0.95)
-    (b1StHdiMin, b1StHdiMax) = hdi(b1StSamples[burnin..^1], 0.95)
-    (sdStHdiMin, sdStHdiMax) = hdi(sdStSamples[burnin..^1], 0.95)
-  echo b0StHdiMin, " ", b0StHdiMax
-  echo b1StHdiMin, " ", b1StHdiMax
-  echo sdStHdiMin, " ", sdStHdiMax
-  let 
-    stDf = seqsToDf({
-      "ixs":ixs, 
-      "b0":b0StSamples[burnin..^1],
-      "b1":b1StSamples[burnin..^1],
-      "sd":sdStSamples[burnin..^1]})
-
-
-nbText: md"""
-### Plots
-"""
-nbCode:
-  ggplot(stDf, aes(x="ixs", y="b0")) + 
-    geom_line() +
+  ixs = toSeq(0 .. nSamples)
+  df = seqsToDf({
+    "ixs": cycle(ixs, 2), 
+    "chain": concat(repeat(1, nSamples + 1), repeat(2, nSamples + 1)), 
+    "b0": concat(b0Samples1, b0Samples2),
+    "b1": concat(b1Samples1, b1Samples2),
+    "sd": concat(sdSamples1, sdSamples2)})
+  ggplot(df, aes(x="ixs", y="b0")) + 
+    geom_line(aes(color="chain")) +
     ggsave("images/st-samples-b0.png")
   
-  ggplot(stDf, aes(x="ixs", y="b1")) + 
-    geom_line() +
+  ggplot(df, aes(x="ixs", y="b1")) + 
+    geom_line(aes(color="chain")) +
     ggsave("images/st-samples-b1.png")
   
-  ggplot(stDf, aes(x="ixs", y="sd")) + 
-    geom_line() +
+  ggplot(df, aes(x="ixs", y="sd")) + 
+    geom_line(aes(color="chain")) +
     ggsave("images/st-samples-sd.png")
-
-  ggplot(stDf, aes("b0")) +
-    geom_histogram() +
-    ggsave("images/st-hist-b0.png")
-  
-  ggplot(stDf, aes("b1")) +
-    geom_histogram() +
-    ggsave("images/st-hist-b1.png")
-  
-  ggplot(stDf, aes("sd")) +
-    geom_histogram() +
-    ggsave("images/st-hist-sd.png")
 
 nbImage("images/st-samples-b0.png")
 nbImage("images/st-samples-b1.png")
 nbImage("images/st-samples-sd.png")
 
+
+nbText: md"""
+# Burnin
+"""
+nbCode:
+  b0Burn = concat(b0Samples1[burnin..^1], b0Samples2[burnin..^1])
+  b1Burn = concat(b1Samples1[burnin..^1], b1Samples2[burnin..^1])
+  sdBurn = concat(sdSamples1[burnin..^1], sdSamples2[burnin..^1])
+
+
+nbText: md"""
+# Histograms
+"""
+nbCode:
+  ixs = toSeq(0 .. nSamples - burnin)
+  df = seqsToDf({
+    "ixs": cycle(ixs, 2), 
+    "chain": concat(repeat(1, ixs.len), repeat(2, ixs.len)), 
+    "b0": b0Burn,
+    "b1": b1Burn,
+    "sd": sdBurn})
+  ggplot(df, aes(x="b0", fill="chain")) +
+    geom_histogram(position="identity", alpha=some(0.5)) +
+    ggsave("images/st-hist-b0.png")
+  
+  ggplot(df, aes(x="b1", fill="chain")) +
+    geom_histogram(position="identity", alpha=some(0.5)) +
+    ggsave("images/st-hist-b1.png")
+  
+  ggplot(df, aes(x="sd", fill="chain")) +
+    geom_histogram(position="identity", alpha=some(0.5)) +
+    ggsave("images/st-hist-sd.png")
+
 nbImage("images/st-hist-b0.png")
 nbImage("images/st-hist-b1.png")
 nbImage("images/st-hist-sd.png")
+
+
+nbText: md"""
+# Posterior Means
+"""
+nbCode:
+  meanB0 = mean(b0Burn)
+  meanB1 = mean(b1Burn)
+  meanSd = mean(sdBurn)
+  echo meanB0
+  echo meanB1
+  echo meanSd
+
+
+nbText: md"""
+# Equal Tailed Interval
+"""
+nbCode:
+  (b0EtiMin, b0EtiMax) = eti(b0Burn, 0.89)
+  (b1EtiMin, b1EtiMax) = eti(b1Burn, 0.89)
+  (sdEtiMin, sdEtiMax) = eti(sdBurn, 0.89)
+  echo b0EtiMin, " ", b0EtiMax
+  echo b1EtiMin, " ", b1EtiMax
+  echo sdEtiMin, " ", sdEtiMax
+
+
+nbText: md"""
+# Highest Density Interval
+"""
+nbCode:
+  (b0HdiMin, b0HdiMax) = hdi(b0Burn, 0.89)
+  (b1HdiMin, b1HdiMax) = hdi(b1Burn, 0.89)
+  (sdHdiMin, sdHdiMax) = hdi(sdBurn, 0.89)
+  echo b0HdiMin, " ", b0HdiMax
+  echo b1HdiMin, " ", b1HdiMax
+  echo sdHdiMin, " ", sdHdiMax
 
 
 nbText: md"""
