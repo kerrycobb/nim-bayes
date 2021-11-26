@@ -270,7 +270,7 @@ StatusSuccess output of write_to_png
 <p>Initially the mcmc chain may spend time exploring unlikely regions of
 parameter space. We can get a better approximation of the posterior if we
 exclude these early steps in the chain. These excluded samples are referred to<br />
-as the burnin. A burnin of $10%$ seems to work well with our informative priors
+as the burnin. A burnin of 10% seems to work well with our informative priors
 and starting values.</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">var</span>
   burnin = (nSamples.<span class="hljs-built_in">float</span> * <span class="hljs-number">0.1</span> + <span class="hljs-number">1</span>).<span class="hljs-built_in">int</span>
@@ -326,9 +326,9 @@ the mean. Let's see how close these values are to the true values of the paramet
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.3239560905850797
-1.008189709400152
-0.849210855656735
+<pre><samp>-0.4546959443132059
+1.006589253428347
+1.085232376715402
 </samp></pre>
 <h1>Credible Intervals</h1>
 <p>We The means give us a point estimate for our parameter values but they tell us
@@ -370,9 +370,9 @@ Credible interval threshold values are completely arbitrary.</p>
 <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
 <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
 <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
-<pre><samp>-0.6170517917322343 -0.008467188688193572
-1.002991915598452 1.013250364425417
-0.7541564440854457 0.9540643872406819
+<pre><samp>-0.889405885732931 -0.03709575172212148
+0.9998389512522882 1.013916077746567
+0.9610600812800236 1.219309894634645
 </samp></pre>
 <h2>Highest Density Interval</h2>
 <pre><code class="nim hljs"><span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =
@@ -396,9 +396,9 @@ Credible interval threshold values are completely arbitrary.</p>
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.5800420499126808 0.0241196910410927
-1.003122485718627 1.013265832517531
-0.7433858302364954 0.9376893572599122
+<pre><samp>-0.821866632494207 0.005055447284897235
+0.9990516637030115 1.012928261163502
+0.9588294141619078 1.211997937847195
 </samp></pre>
 <h1>Standardize Data</h1>
 <p>We might be able to get even better mixing by standardizing the data and
@@ -534,9 +534,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.3551125923794411
-1.008640805768852
-0.1152425089023909
+<pre><samp>-0.4895693192658965
+1.007159279800622
+0.2928540388529229
 </samp></pre>
 <h1>Equal Tailed Interval</h1>
 <pre><code class="nim hljs">(b0EtiMin, b0EtiMax) = eti(b0Burn, <span class="hljs-number">0.89</span>)
@@ -545,9 +545,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
 <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
 <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
-<pre><samp>-0.7372544461462738 0.01703279290945403
-1.002490005593506 1.0148922615613
--0.2466404130246431 0.4890857276583773
+<pre><samp>-0.9446019709928725 -0.03003575532367364
+0.9995686704865067 1.01474769761753
+-0.1365582559727727 0.7460304043056638
 </samp></pre>
 <h1>Highest Density Interval</h1>
 <pre><code class="nim hljs">(b0HdiMin, b0HdiMax) = hdi(b0Burn, <span class="hljs-number">0.89</span>)
@@ -556,9 +556,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.7310572080588926 0.02240049916583331
-1.002692477793619 1.015034181780213
--0.2517505112806973 0.4822415687409958
+<pre><samp>-0.9517791451348145 -0.03855780663149488
+0.9996963154660903 1.014846007190409
+-0.1330287312211453 0.7482199787449488
 </samp></pre>
 <h1>Final Note</h1>
 <p>Of course we could have simply and more efficiently done this using least squares regression.
@@ -730,7 +730,7 @@ nbCode:
       likelihoods[i] = ln(normalPdf(y[i], pred, sd))
     <span class="hljs-literal">result</span> = sum(likelihoods) 
 
-
+<span class="hljs-comment">#TODO: Word this better</span>
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Posterior
 We cannot analytically solve the posterior probability distribution of our
@@ -851,7 +851,7 @@ nbText: <span class="hljs-string">md&quot;&quot;&quot;
 Initially the mcmc chain may spend time exploring unlikely regions of 
 parameter space. We can get a better approximation of the posterior if we 
 exclude these early steps in the chain. These excluded samples are referred to   
-as the burnin. A burnin of $10%$ seems to work well with our informative priors 
+as the burnin. A burnin of 10% seems to work well with our informative priors 
 and starting values. 
 &quot;&quot;&quot;</span>
 nbCode:

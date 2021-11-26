@@ -152,7 +152,7 @@ nbCode:
       likelihoods[i] = ln(normalPdf(y[i], pred, sd))
     result = sum(likelihoods) 
 
-
+#TODO: Word this better
 nbText: md"""
 # Posterior
 We cannot analytically solve the posterior probability distribution of our
@@ -273,7 +273,7 @@ nbText: md"""
 Initially the mcmc chain may spend time exploring unlikely regions of 
 parameter space. We can get a better approximation of the posterior if we 
 exclude these early steps in the chain. These excluded samples are referred to   
-as the burnin. A burnin of $10%$ seems to work well with our informative priors 
+as the burnin. A burnin of 10% seems to work well with our informative priors 
 and starting values. 
 """
 nbCode:
