@@ -120,9 +120,6 @@ the proability density functions for our priors.</p>
 <h4>Gamma PDF</h4>
 <p>$$ p(x) = \frac{1}{\Gamma(k)\theta^{k}} x^{k-1} e^{-\frac{x}{\theta}} $$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">import</span>
-  distributions
-
-<span class="hljs-keyword">import</span>
   std / math
 
 <span class="hljs-keyword">proc</span> normalPdf(z, mu, sigma: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> =
@@ -220,7 +217,7 @@ The steps of this algorithm are as follows:</p>
   (b0Samples1, b1Samples1, sdSamples1) = mcmc(x, y, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>,
       <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)</code></pre>
 <p>Should do another chain with different starting values</p>
-<pre><code class="nim hljs"><span class="hljs-keyword">var</span> (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.9</span>,
+<pre><code class="nim hljs"><span class="hljs-keyword">var</span> (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, <span class="hljs-number">0.1</span>, <span class="hljs-number">1.02</span>, <span class="hljs-number">1.1</span>,
     <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)</code></pre>
 <h1>Trace plots</h1>
 <p>We can get a sense for how well our mcmc performed and therefore gain some<br />
@@ -326,9 +323,9 @@ the mean. Let's see how close these values are to the true values of the paramet
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.4546959443132059
-1.006589253428347
-1.085232376715402
+<pre><samp>-0.1908241656792634
+1.002581119608087
+0.999646398364294
 </samp></pre>
 <h1>Credible Intervals</h1>
 <p>We The means give us a point estimate for our parameter values but they tell us
@@ -370,9 +367,9 @@ Credible interval threshold values are completely arbitrary.</p>
 <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
 <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
 <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
-<pre><samp>-0.889405885732931 -0.03709575172212148
-0.9998389512522882 1.013916077746567
-0.9610600812800236 1.219309894634645
+<pre><samp>-0.5360836531123057 0.1650582754538911
+0.9969445041487184 1.008268819916758
+0.8939711438887052 1.113858601688389
 </samp></pre>
 <h2>Highest Density Interval</h2>
 <pre><code class="nim hljs"><span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =
@@ -396,9 +393,9 @@ Credible interval threshold values are completely arbitrary.</p>
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.821866632494207 0.005055447284897235
-0.9990516637030115 1.012928261163502
-0.9588294141619078 1.211997937847195
+<pre><samp>-0.5228595263866326 0.1732315662528872
+0.9975307830804496 1.008650023990512
+0.8927504778460364 1.109800414119305
 </samp></pre>
 <h1>Standardize Data</h1>
 <p>We might be able to get even better mixing by standardizing the data and
@@ -429,10 +426,23 @@ different scale, the proposals we were making before wont work very well. So
 we should make the proposed changes smaller.</p>
 <p>We could also have changed our priors since the data are on a different scale
 but let's see what happens if we leave them the same.</p>
-<pre><code class="nim hljs">(b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>,
-    <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)
-(b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.01</span>, <span class="hljs-number">1.1</span>, <span class="hljs-number">1.1</span>,
-    <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)</code></pre>
+<pre><code class="nim hljs">(b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">0.05</span>,
+    <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)
+(b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.0001</span>, <span class="hljs-number">1.01</span>,
+    <span class="hljs-number">0.051</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>)
+<span class="hljs-keyword">echo</span> mean(b0Samples1)
+<span class="hljs-keyword">echo</span> mean(b1Samples1)
+<span class="hljs-keyword">echo</span> mean(sdSamples1)
+<span class="hljs-keyword">echo</span> mean(b0Samples2)
+<span class="hljs-keyword">echo</span> mean(b1Samples2)
+<span class="hljs-keyword">echo</span> mean(sdSamples2)</code></pre>
+<pre><samp>3.795946426557245e-05
+0.9994064132775144
+0.04275043711748474
+-2.322934709008947e-05
+0.9994037881830803
+0.04280432472946218
+</samp></pre>
 <h3>Convert back to original scale</h3>
 <p>To interpret these new estimates we can convert back to the original scale.
 $$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$<br />
@@ -534,9 +544,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.4895693192658965
-1.007159279800622
-0.2928540388529229
+<pre><samp>-0.2241705270876181
+1.003057570388122
+0.715325642079128
 </samp></pre>
 <h1>Equal Tailed Interval</h1>
 <pre><code class="nim hljs">(b0EtiMin, b0EtiMax) = eti(b0Burn, <span class="hljs-number">0.89</span>)
@@ -545,9 +555,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
 <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
 <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
-<pre><samp>-0.9446019709928725 -0.03003575532367364
-0.9995686704865067 1.01474769761753
--0.1365582559727727 0.7460304043056638
+<pre><samp>-0.6435550499385485 0.198174948110136
+0.996245893288753 1.009863234834201
+0.3245825137704657 1.133751424496467
 </samp></pre>
 <h1>Highest Density Interval</h1>
 <pre><code class="nim hljs">(b0HdiMin, b0HdiMax) = hdi(b0Burn, <span class="hljs-number">0.89</span>)
@@ -556,9 +566,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.9517791451348145 -0.03855780663149488
-0.9996963154660903 1.014846007190409
--0.1330287312211453 0.7482199787449488
+<pre><samp>-0.6440198847379222 0.1969556880305063
+0.9964242414872764 1.009977118689592
+0.3088670682856645 1.113229217333945
 </samp></pre>
 <h1>Final Note</h1>
 <p>Of course we could have simply and more efficiently done this using least squares regression.
@@ -680,7 +690,6 @@ $$ p(x) = \frac{1}{\Gamma(k)\theta^{k}} x^{k-1} e^{-\frac{x}{\theta}} $$
 &quot;&quot;&quot;</span>
 
 nbCode:
-  <span class="hljs-keyword">import</span> distributions  
   <span class="hljs-keyword">import</span> std/math
 
   <span class="hljs-keyword">proc</span> normalPdf(z, mu, sigma: <span class="hljs-built_in">float</span>): <span class="hljs-built_in">float</span> = 
@@ -807,7 +816,7 @@ Should do another chain with different starting values
 
 nbCode:
   <span class="hljs-keyword">var</span>
-    (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.9</span>, 
+    (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, <span class="hljs-number">0.1</span>, <span class="hljs-number">1.02</span>, <span class="hljs-number">1.1</span>, 
                                                 <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>, <span class="hljs-number">0.1</span>)
 
 
@@ -1019,8 +1028,17 @@ We could also have changed our priors since the data are on a different scale
 but let's see what happens if we leave them the same.
 &quot;&quot;&quot;</span>
 nbCode:
-  (b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
-  (b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.01</span>, <span class="hljs-number">1.1</span>, <span class="hljs-number">1.1</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
+  (b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">0.05</span>, 
+                                              <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
+  (b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, <span class="hljs-number">0.0001</span>, <span class="hljs-number">1.01</span>, <span class="hljs-number">0.051</span>, 
+                                              <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>, <span class="hljs-number">0.01</span>) 
+  <span class="hljs-keyword">echo</span> mean(b0Samples1)
+  <span class="hljs-keyword">echo</span> mean(b1Samples1)
+  <span class="hljs-keyword">echo</span> mean(sdSamples1)
+  <span class="hljs-keyword">echo</span> mean(b0Samples2)
+  <span class="hljs-keyword">echo</span> mean(b1Samples2)
+  <span class="hljs-keyword">echo</span> mean(sdSamples2)
+
 
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot; 

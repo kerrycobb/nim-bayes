@@ -102,7 +102,6 @@ $$ p(x) = \frac{1}{\Gamma(k)\theta^{k}} x^{k-1} e^{-\frac{x}{\theta}} $$
 """
 
 nbCode:
-  import distributions  
   import std/math
 
   proc normalPdf(z, mu, sigma: float): float = 
@@ -229,7 +228,7 @@ Should do another chain with different starting values
 
 nbCode:
   var
-    (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, 0.1, 0.9, 0.9, 
+    (b0Samples2, b1Samples2, sdSamples2) = mcmc(x, y, nSamples, 0.1, 1.02, 1.1, 
                                                 0.1, 0.1, 0.1)
 
 
@@ -441,8 +440,17 @@ We could also have changed our priors since the data are on a different scale
 but let's see what happens if we leave them the same.
 """
 nbCode:
-  (b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, 0, 1, 1, 0.01, 0.01, 0.01) 
-  (b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, 0.01, 1.1, 1.1, 0.01, 0.01, 0.01) 
+  (b0Samples1, b1Samples1, sdSamples1) = mcmc(stX, stY, nSamples, 0.0, 1.0, 0.05, 
+                                              0.01, 0.01, 0.01) 
+  (b0Samples2, b1Samples2, sdSamples2) = mcmc(stX, stY, nSamples, 0.0001, 1.01, 0.051, 
+                                              0.01, 0.01, 0.01) 
+  echo mean(b0Samples1)
+  echo mean(b1Samples1)
+  echo mean(sdSamples1)
+  echo mean(b0Samples2)
+  echo mean(b1Samples2)
+  echo mean(sdSamples2)
+
 
 
 nbText: md""" 
