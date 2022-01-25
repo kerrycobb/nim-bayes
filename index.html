@@ -323,9 +323,9 @@ the mean. Let's see how close these values are to the true values of the paramet
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.1896050704901563
-1.001142183468065
-1.021478576011831
+<pre><samp>-0.1251009119571541
+1.001596464626197
+1.011896929529412
 </samp></pre>
 <h1>Credible Intervals</h1>
 <p>We The means give us a point estimate for our parameter values but they tell us
@@ -367,9 +367,9 @@ Credible interval threshold values are completely arbitrary.</p>
 <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
 <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
 <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
-<pre><samp>-0.6307753350130431 0.2405507379499496
-0.9943855120740054 1.007570304993719
-0.9054390323627701 1.153351581217871
+<pre><samp>-0.4803835706588309 0.2378119371313606
+0.9959716353081368 1.00720411862831
+0.8980368061360121 1.134114766605278
 </samp></pre>
 <h2>Highest Density Interval</h2>
 <pre><code class="nim hljs"><span class="hljs-keyword">proc</span> hdi(samples: <span class="hljs-built_in">seq</span>[<span class="hljs-built_in">float</span>]; credMass: <span class="hljs-built_in">float</span>): (<span class="hljs-built_in">float</span>, <span class="hljs-built_in">float</span>) =
@@ -393,13 +393,15 @@ Credible interval threshold values are completely arbitrary.</p>
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.5734889260357414 0.2777193813084474
-0.9938846202187694 1.006982497732871
-0.8954264741762239 1.137726709605412
+<pre><samp>-0.476253695941856 0.2378119371313606
+0.9963459931011095 1.007488934544839
+0.9030441540178104 1.135387227509518
 </samp></pre>
 <h1>Standardize Data</h1>
 <p>We might be able to get even better mixing by standardizing the data and
 removing correlation between the slope and the intercept.</p>
+<p>$$ \zeta_{x_{i}} = \frac{x_{i} - \bar{x}}{SD_{x}} $$</p>
+<p>$$ \zeta_{y_{i}} = \frac{y_{i} - \bar{y}}{SD_{y}} $$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">var</span>
   stX = newSeq[<span class="hljs-built_in">float</span>](n)
   stY = newSeq[<span class="hljs-built_in">float</span>](n)
@@ -411,6 +413,7 @@ removing correlation between the slope and the intercept.</p>
   stX[i] = (x[i] - meanX) / sdX
   stY[i] = (y[i] - meanY) / sdY</code></pre>
 <p>We can see that these data are now centered around zero and have the same scale.</p>
+<p>TODO: Figure out why this isn't plotting correctly</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">var</span> standardized = seqsToDf(stX, stY)
 ggplot(standardized, aes(<span class="hljs-string">&quot;x&quot;</span>, <span class="hljs-string">&quot;y&quot;</span>)) + geom_point() +
     ggsave(<span class="hljs-string">&quot;images/st-simulated-data.png&quot;</span>)</code></pre>
@@ -436,19 +439,19 @@ but let's see what happens if we leave them the same.</p>
 <span class="hljs-keyword">echo</span> mean(b0Samples2)
 <span class="hljs-keyword">echo</span> mean(b1Samples2)
 <span class="hljs-keyword">echo</span> mean(sdSamples2)</code></pre>
-<pre><samp>-3.009034459580238e-05
-0.9992240596569951
-0.04831925496994427
--4.533500297361768e-05
-0.9990553526596943
-0.0482398715278403
+<pre><samp>1.704149929882008e-05
+0.9993311284869305
+0.04339613598062367
+5.644329595113632e-05
+0.9992750249677675
+0.04335781101449433
 </samp></pre>
 <h3>Convert back to original scale</h3>
-<p>To interpret these new estimates we can convert back to the original scale.
-$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$<br />
-$$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$
-TODO: Need to confirm that this is correct:
-$$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$</p>
+<p>To interpret these new estimates we can convert back to the original scale.</p>
+<p>$$ \beta_{0} = \zeta_{0} SD_{y} + \bar{y} - \zeta_{\beta_{1}} SD_{y} \bar{x} / SD_{x} $$<br />
+$$ \beta_{1} = \zeta_{\beta_{1}} SD_{y} / SD_{x} $$</p>
+<p>TODO: Need to confirm that this is correct:</p>
+<p>$$ \tau = \zeta_{\tau} SD_{y} + \bar{y} - \zeta_{\beta_{1}} SD_{y} \bar{x} / SD_{x} $$</p>
 <pre><code class="nim hljs"><span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:
   b0Samples1[i] = b0Samples1[i] * sdY + meanY -
       b1Samples1[i] * sdY * meanX / sdX
@@ -544,9 +547,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> meanB0
 <span class="hljs-keyword">echo</span> meanB1
 <span class="hljs-keyword">echo</span> meanSd</code></pre>
-<pre><samp>-0.2023695701968007
-1.001333366998545
-0.81801159699034
+<pre><samp>-0.1199786127847786
+1.001503504072793
+0.9111577291736185
 </samp></pre>
 <h1>Equal Tailed Interval</h1>
 <pre><code class="nim hljs">(b0EtiMin, b0EtiMax) = eti(b0Burn, <span class="hljs-number">0.89</span>)
@@ -555,9 +558,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> b0EtiMin, <span class="hljs-string">&quot; &quot;</span>, b0EtiMax
 <span class="hljs-keyword">echo</span> b1EtiMin, <span class="hljs-string">&quot; &quot;</span>, b1EtiMax
 <span class="hljs-keyword">echo</span> sdEtiMin, <span class="hljs-string">&quot; &quot;</span>, sdEtiMax</code></pre>
-<pre><samp>-0.693695074052286 0.2934419644980153
-0.9935717170889153 1.009000077356251
-0.3445385008873316 1.315096311924194
+<pre><samp>-0.5472818689204857 0.301686164574306
+0.994636736396688 1.008480039363207
+0.51226906697201 1.327108651576197
 </samp></pre>
 <h1>Highest Density Interval</h1>
 <pre><code class="nim hljs">(b0HdiMin, b0HdiMax) = hdi(b0Burn, <span class="hljs-number">0.89</span>)
@@ -566,9 +569,9 @@ meanSd = mean(sdBurn)
 <span class="hljs-keyword">echo</span> b0HdiMin, <span class="hljs-string">&quot; &quot;</span>, b0HdiMax
 <span class="hljs-keyword">echo</span> b1HdiMin, <span class="hljs-string">&quot; &quot;</span>, b1HdiMax
 <span class="hljs-keyword">echo</span> sdHdiMin, <span class="hljs-string">&quot; &quot;</span>, sdHdiMax</code></pre>
-<pre><samp>-0.6764543420027849 0.3091544890406936
-0.9937352611257259 1.009117141256259
-0.348118078157114 1.316757664459629
+<pre><samp>-0.532758446778665 0.312320382391384
+0.9942181012141709 1.008023046262762
+0.4953068004905106 1.305225549154549
 </samp></pre>
 <h1>Final Note</h1>
 <p>Of course we could have simply and more efficiently done this using least squares regression.
@@ -994,6 +997,11 @@ nbText: <span class="hljs-string">md&quot;&quot;&quot;
 # Standardize Data
 We might be able to get even better mixing by standardizing the data and 
 removing correlation between the slope and the intercept.
+
+$$ \zeta_{x_{i}} = \frac{x_{i} - \bar{x}}{SD_{x}} $$
+
+$$ \zeta_{y_{i}} = \frac{y_{i} - \bar{y}}{SD_{y}} $$
+
 &quot;&quot;&quot;</span>
 nbCode: 
   <span class="hljs-keyword">var</span> 
@@ -1010,6 +1018,8 @@ nbCode:
 
 nbText: <span class="hljs-string">md&quot;&quot;&quot;
 We can see that these data are now centered around zero and have the same scale.
+
+TODO: Figure out why this isn't plotting correctly
 &quot;&quot;&quot;</span>
 nbCode:
   <span class="hljs-keyword">var</span> standardized = seqsToDf(stX, stY)
@@ -1044,10 +1054,13 @@ nbCode:
 nbText: <span class="hljs-string">md&quot;&quot;&quot; 
 ### Convert back to original scale
 To interpret these new estimates we can convert back to the original scale.
-$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
-$$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$ 
+
+$$ \beta_{0} = \zeta_{0} SD_{y} + \bar{y} - \zeta_{\beta_{1}} SD_{y} \bar{x} / SD_{x} $$  
+$$ \beta_{1} = \zeta_{\beta_{1}} SD_{y} / SD_{x} $$ 
+
 TODO: Need to confirm that this is correct:
-$$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
+
+$$ \tau = \zeta_{\tau} SD_{y} + \bar{y} - \zeta_{\beta_{1}} SD_{y} \bar{x} / SD_{x} $$  
 &quot;&quot;&quot;</span>
 nbCode: 
   <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; nSamples:

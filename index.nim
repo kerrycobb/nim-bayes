@@ -406,6 +406,11 @@ nbText: md"""
 # Standardize Data
 We might be able to get even better mixing by standardizing the data and 
 removing correlation between the slope and the intercept.
+
+$$ \zeta_{x_{i}} = \frac{x_{i} - \bar{x}}{SD_{x}} $$
+
+$$ \zeta_{y_{i}} = \frac{y_{i} - \bar{y}}{SD_{y}} $$
+
 """
 nbCode: 
   var 
@@ -422,6 +427,8 @@ nbCode:
 
 nbText: md"""
 We can see that these data are now centered around zero and have the same scale.
+
+TODO: Figure out why this isn't plotting correctly
 """
 nbCode:
   var standardized = seqsToDf(stX, stY)
@@ -456,10 +463,13 @@ nbCode:
 nbText: md""" 
 ### Convert back to original scale
 To interpret these new estimates we can convert back to the original scale.
-$$ \beta_{0} = \zeta_{0} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
-$$ \beta_{1} = \zeta_{1} SD_{y} / SD_{x} $$ 
+
+$$ \beta_{0} = \zeta_{0} SD_{y} + \bar{y} - \zeta_{\beta_{1}} SD_{y} \bar{x} / SD_{x} $$  
+$$ \beta_{1} = \zeta_{\beta_{1}} SD_{y} / SD_{x} $$ 
+
 TODO: Need to confirm that this is correct:
-$$ \tau = \zeta_{\tau} SD_{y} + M_{y} - \zeta_{1} SD_{y} M_{x} / SD_{x} $$  
+
+$$ \tau = \zeta_{\tau} SD_{y} + \bar{y} - \zeta_{\beta_{1}} SD_{y} \bar{x} / SD_{x} $$  
 """
 nbCode: 
   for i in 0 ..< nSamples:
