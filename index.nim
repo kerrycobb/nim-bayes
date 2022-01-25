@@ -25,17 +25,17 @@ Where each of these terms are referred to as:
 $$ \text{Posterior} = \frac{\text{Likelihood} \cdot \text{Prior}}{\text{Marginal Likelihood}}$$
 
 In this tutorial we will condsider a simple linear model 
-$ y_{i} = \beta_{0} + \beta_{1} x_{i} + \epsilon_{i} $ where the parameters
-$\beta_0$ (y intercept), $\beta_1$ (slope), and $\epsilon$ (random error)
-describe the relationship between a predictor variable $x$ and a response
-variable $y$, with some unaccounted for residual ranodom error that 
-is normally distributed. 
+$ y_{i} = \beta_{0} + \beta_{1} x_{i} + \epsilon_{i} $ where $\epsilon \sim N(0, \tau)$.
+Under this model, the parameters $\beta_0$ (y intercept), $\beta_1$ (slope), 
+and $\epsilon$ (residual random error) describe the relationship between a 
+predictor variable $x$ and a response variable $y$, with some unaccounted for 
+residual random error that is normally distributed with a mean of $0$ and 
+standard deviation $\tau$.
 
 We well estimate the values of the slope ($\beta_{0}$), the y-intercept 
-($\beta_{1}$), and the standard deviation of the normally distributed random
-error which we will call $\tau$.
+($\beta_{1}$), and the standard deviation of the residual random error ($\tau$).
 
-We can express this using Bayes rule:
+Expressing this with Bayes rule give us:
 
 $$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) =
   \frac{P(Data|\beta_{0}, \beta_{1}, \tau) P(\beta_{0}, \beta_{1}, \tau)}
@@ -44,7 +44,7 @@ $$ \displaystyle P(\beta_{0}, \beta_{1}, \tau | Data) =
 
 # Generate Data
 We need some data to work with. Let's simulate data  
-under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, 1)$ with 
+under the model: $y = 0 + 1x + \epsilon$ where $\epsilon \sim N(0, \tau)$ with 
 $\beta_{0}=0$ $\beta_{1}=1$ and $\tau=1$
 """
 nbCode:
