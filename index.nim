@@ -151,7 +151,7 @@ nbCode:
       likelihoods[i] = ln(normalPdf(y[i], pred, sd))
     result = sum(likelihoods) 
 
-#TODO: Word this better
+#TODO: Word this better, explain what the equation means
 nbText: md"""
 # Posterior
 We cannot analytically solve the posterior probability distribution of our
