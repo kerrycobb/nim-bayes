@@ -193,7 +193,6 @@ nbCode:
       likelihoods[i] = ln(normalPdf(y[i], pred, sd))
     result = sum(likelihoods)
 
-#TODO: Finish
 nbText: md"""
 # Posterior
 We cannot analytically solve the posterior probability distribution of our
